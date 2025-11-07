@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VerzusXYZ needs access to your microphone to record audio with your screen recordings of gameplay.</string>
 </dict>
 </plist>

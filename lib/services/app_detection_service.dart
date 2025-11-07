@@ -44,9 +44,12 @@
 
 import 'dart:typed_data';
 
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
+import 'package:verzus/services/platform_channel_service.dart';
 
 class DetectedAppInfo {
   final String name;
@@ -86,5 +89,13 @@ class AppDetectionService {
       // iOS/web/desktop: Not supported
       return [];
     }
+  }
+
+  // New method to monitor if the game is still running
+  Stream<bool> isAppRunning(String packageId) {
+    final platformChannelService = PlatformChannelService();
+    return Stream.periodic(const Duration(seconds: 5), (_) {
+      return platformChannelService.isAppRunning(packageId);
+    }).asyncMap((event) async => await event).takeWhile((isRunning) => isRunning);
   }
 }
