@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "5225172458",
+    "project_id": "ic1dwe87k4yifqbtntk1cb4e2559gx",
+    "storage_bucket": "ic1dwe87k4yifqbtntk1cb4e2559gx.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:5225172458:android:37266a1b24a134a20fb693",
+        "android_client_info": {
+          "package_name": "aa.verzus.xyz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8h_6hMe8FlzUP1DzKYflgh0huO7tzf1A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

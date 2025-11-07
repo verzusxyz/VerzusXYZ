@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profiles - private access only to owner
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User wallets - private access only to owner
+    match /wallets/{walletId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.user_id;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
+    }
+    
+    // Wallet transactions - private access only to owner
+    match /wallet_transactions/{transactionId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.user_id;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
+    }
+    
+    // Matches - public read for discovering matches, private write access
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        (request.auth.uid == request.resource.data.creator_id ||
+         request.auth.uid == request.resource.data.opponent_id);
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.creator_id ||
+         request.auth.uid == resource.data.opponent_id);
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creator_id;
+    }
+    
+    // Match invitations - private access to invited user and creator
+    match /match_invitations/{invitationId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.invited_user_id ||
+         request.auth.uid == resource.data.creator_id);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.creator_id;
+    }
+    
+    // Tournaments - public read for discovering, restricted write access
+    match /tournaments/{tournamentId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.creator_id;
+      allow update: if request.auth != null && request.auth.uid == resource.data.creator_id;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creator_id;
+    }
+    
+    // Tournament participants - public read, private write for participants
+    match /tournament_participants/{participantId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.user_id;
+    }
+    
+    // Skill topics - public read access for all authenticated users
+    match /skill_topics/{topicId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Admin only - will be managed through console or cloud functions
+    }
+    
+    // Leaderboard entries - public read access for all authenticated users
+    match /leaderboard_entries/{entryId} {
+      allow read: if request.auth != null;
+      allow write: if false; // System managed - updated by cloud functions
+    }
+    
+    // Game results - read access for participants, write access for match creators
+    match /game_results/{resultId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.player1_id ||
+         request.auth.uid == resource.data.player2_id);
+      allow create, update: if request.auth != null && 
+        (request.auth.uid == request.resource.data.player1_id ||
+         request.auth.uid == request.resource.data.player2_id);
+    }
+    
+    // System settings - public read access for app configuration
+    match /system_settings/{settingId} {
+      allow read: if true; // Public read for app settings like fee structures
+      allow write: if false; // Admin only
+    }
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    
+    "games": {
+      "$gameId": {
+        ".read": "auth != null && (root.child('games').child($gameId).child('players').child(auth.uid).exists() || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && (root.child('games').child($gameId).child('players').child(auth.uid).exists() || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        
+        "moves": {
+          "$moveId": {
+            ".validate": "newData.hasChild('playerId') && newData.child('playerId').val() == auth.uid"
+          }
+        },
+        
+        "chat": {
+          ".read": "auth != null && root.child('games').child($gameId).child('players').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('games').child($gameId).child('players').child(auth.uid).exists()"
+        }
+      }
+    },
+    
+    "tournaments": {
+      "$tournamentId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+        
+        "players": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() || !data.hasChild(auth.uid))"
+        },
+        
+        "matches": {
+          "$matchId": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+          }
+        },
+        
+        "chat": {
+          ".read": "auth != null && root.child('tournaments').child($tournamentId).child('players').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('tournaments').child($tournamentId).child('players').child(auth.uid).exists()"
+        }
+      }
+    },
+    
+    "users": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && auth.uid == $userId",
+        
+        "notifications": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null && auth.uid == $userId"
+        },
+        
+        "affiliate": {
+          ".read": "auth != null && (auth.uid == $userId || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+          ".write": "auth != null && auth.uid == $userId"
+        }
+      }
+    },
+    
+    "chat": {
+      "$chatId": {
+        ".read": "auth != null && root.child('chat').child($chatId).child('participants').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('chat').child($chatId).child('participants').child(auth.uid).exists()",
+        
+        "messages": {
+          "$messageId": {
+            ".validate": "newData.hasChild('senderId') && newData.child('senderId').val() == auth.uid"
+          }
+        }
+      }
+    },
+    
+    "admin": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      
+      "float": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+      },
+      
+      "affiliates": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+      }
+    }
+  }
+} 
