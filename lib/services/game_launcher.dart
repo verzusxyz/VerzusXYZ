@@ -34,7 +34,7 @@ class GameLauncherService {
             final isInstalled = await DeviceApps.isAppInstalled(pkg);
             if (isInstalled) {
               DeviceApps.openApp(pkg);
-              _monitorAppClosure(game, ref);
+              _monitorAppClosure(game);
             } else {
               final playUrl = 'https://play.google.com/store/apps/details?id=$pkg';
               final ok = await launchUrlString(playUrl, mode: LaunchMode.externalApplication);
@@ -57,14 +57,14 @@ class GameLauncherService {
     }
   }
 
-  void _monitorAppClosure(GameModel game, WidgetRef ref) {
+  void _monitorAppClosure(GameModel game) {
     // This is a simplified implementation. A more robust solution would
     // involve a background service that monitors running apps.
     // Timer.periodic(const Duration(seconds: 5), (timer) async {
     //   final isRunning = await DeviceApps.isAppInstalled(game.packageId!);
     //   if (!isRunning) {
-    //     final screenRecordService = ref.read(screenRecordServiceProvider);
-    //     screenRecordService.stopRecordingAndProcess(game);
+    //     final screenRecordService = _ref.read(screenRecordServiceProvider.notifier);
+    //     screenRecordService.stopRecordingAndProcess(game, _ref.read(activeMatchProvider)!.matchId);
     //     timer.cancel();
     //   }
     // });
