@@ -60,24 +60,25 @@ class VerzusApp extends ConsumerStatefulWidget {
 }
 
 class _VerzusAppState extends ConsumerState<VerzusApp> {
-  @override
-  void initState() {
-    super.initState();
-    AwesomeNotifications().setListeners(
-      onActionReceivedMethod: (receivedAction) async {
-        if (receivedAction.buttonKeyPressed == 'STOP_RECORDING') {
-          final activeMatch = ref.read(activeMatchProvider);
-          if (activeMatch != null) {
-            ref.read(screenRecordServiceProvider.notifier).stopRecordingAndProcess(activeMatch.game, activeMatch.matchId);
-            ref.read(activeMatchProvider.notifier).state = null;
-          }
-        }
-      },
-    );
-  }
+  bool _notificationsInitialized = false;
 
   @override
   Widget build(BuildContext context) {
+    if (!_notificationsInitialized) {
+      AwesomeNotifications().setListeners(
+        onActionReceivedMethod: (receivedAction) async {
+          if (receivedAction.buttonKeyPressed == 'STOP_RECORDING') {
+            final activeMatch = ref.read(activeMatchProvider);
+            if (activeMatch != null) {
+              ref.read(screenRecordServiceProvider.notifier).stopRecordingAndProcess(activeMatch.game, activeMatch.matchId);
+              ref.read(activeMatchProvider.notifier).state = null;
+            }
+          }
+        },
+      );
+      _notificationsInitialized = true;
+    }
+
     final router = ref.watch(routerProvider);
     
     final themeMode = ref.watch(themeModeProvider);
