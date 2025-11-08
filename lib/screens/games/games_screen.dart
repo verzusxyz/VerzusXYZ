@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/services/games_service.dart';
 import 'package:verzus/services/activity_log_service.dart';
-import 'package:verzus/services/game_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:verzus/providers/game_launcher_provider.dart';
 import 'package:verzus/services/auth_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -108,8 +109,12 @@ class GamesScreen extends ConsumerWidget {
                                     gameId: g.gameId,
                                     platform: g.platform,
                                   );
+                                  // Create a new match document to get a unique ID
+                                  final matchRef = FirebaseFirestore.instance.collection('matches').doc();
+                                  final matchId = matchRef.id;
+
                                   // Launch
-                                  await const GameLauncherService().launchGame(context, g);
+                                  ref.read(gameLauncherServiceProvider).launchGame(context, g, matchId);
                                 },
                                 child: const Text('Play'),
                               ),
