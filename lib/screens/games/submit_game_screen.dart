@@ -402,6 +402,8 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
       roomIdPatterns: const [],
       createdAt: DateTime.now(),
       approvedBy: null,
+      resultType: GameResultType.winLoss,
+      ocrEngine: 'mlkit',
     );
 
     await const GameLauncherService().launchGame(context, game);
@@ -440,6 +442,8 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
             roomIdPatterns: const [],
             createdAt: now,
             approvedBy: null,
+            resultType: GameResultType.winLoss,
+            ocrEngine: 'mlkit',
           );
           await service.upsertGameByCanonicalKey(game);
         }
@@ -505,6 +509,8 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
           roomIdPatterns: const [],
           createdAt: now,
           approvedBy: null,
+          resultType: GameResultType.winLoss,
+          ocrEngine: 'mlkit',
         );
         await service.upsertGameByCanonicalKey(game);
       }
