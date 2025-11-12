@@ -34,7 +34,7 @@ class _MainWrapperState extends ConsumerState<MainWrapper> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      final isRecording = ref.read(screenRecordServiceProvider);
+      final isRecording = ref.read(screenRecordServiceProvider) == RecordingState.recording;
       if (isRecording) {
         _showStopRecordingDialog();
       }
@@ -229,7 +229,7 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 8),
           Consumer(
             builder: (context, ref, child) {
-              final isRecording = ref.watch(screenRecordServiceProvider);
+              final isRecording = ref.watch(screenRecordServiceProvider) == RecordingState.recording;
               if (isRecording) {
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
