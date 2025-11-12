@@ -1,11 +1,13 @@
 import 'dart:async';
-import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:verzus/models/game_model.dart';
-import 'package:verzus/providers/active_match_provider.dart';
-import 'package:verzus/providers/screen_record_provider.dart';
+import 'package.verzus/providers/active_match_provider.dart';
+import 'package.verzus/providers/app_detection_provider.dart';
+import 'package.verzus/providers/screen_record_provider.dart';
+import 'package:verzus/services/app_detection_service.dart';
+import 'package:installed_apps/installed_apps.dart';
 
 class GameLauncherService {
   final Ref _ref;
@@ -31,7 +33,9 @@ class GameLauncherService {
         case 'android':
           final pkg = game.packageId;
           if (pkg != null && pkg.isNotEmpty) {
-            final isInstalled = await InstalledApps.isAppInstalled(pkg);
+            final appDetectionService = _ref.read(appDetectionServiceProvider);
+            final installedApps = await appDetectionService.scanInstalledApps();
+            final isInstalled = installedApps.any((app) => app.packageId == pkg);
             if (isInstalled) {
               InstalledApps.startApp(pkg);
             } else {

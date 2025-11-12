@@ -147,14 +147,14 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
       final ocrText = await _performOcr(screenshotPath, game.ocrEngine);
 
       if (ocrText == null || ocrText.isEmpty) {
-        await _flagForManualReview(matchId, 'OCR failed to extract text.', videoPath: videoPath, thumbnailPath: thumbnailPath);
+        await _flagForManualReview(matchId, 'OCR failed to extract text.', videoPath: videoPath, thumbnailPath: screenshotPath);
         return;
       }
 
       final parser = ScoreParserFactory.getParser(game);
       final result = parser.parse(ocrText);
 
-      await _uploadResult(matchId, result, videoPath, thumbnailPath);
+      await _uploadResult(matchId, result, videoPath, screenshotPath);
     } catch (e) {
       await _flagForManualReview(matchId, 'An unexpected error occurred during processing: $e');
     }
