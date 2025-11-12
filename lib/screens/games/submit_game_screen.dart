@@ -316,9 +316,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/models/game_model.dart';
+import 'package:verzus/providers/game_launcher_provider.dart';
 import 'package:verzus/services/app_detection_service.dart';
 import 'package:verzus/services/games_service.dart';
-import 'package:verzus/services/game_launcher.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -406,7 +406,7 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
       ocrEngine: 'mlkit',
     );
 
-    await const GameLauncherService().launchGame(context, game);
+    ref.read(gameLauncherServiceProvider).launchGame(context, game, 'placeholder_match_id');
   }
 
   Future<void> _submit() async {

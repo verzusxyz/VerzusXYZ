@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:device_apps/device_apps.dart';
+import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -14,7 +14,7 @@ class GameLauncherService {
 
   Future<void> launchGame(BuildContext context, GameModel game, String matchId) async {
     final screenRecordService = _ref.read(screenRecordServiceProvider.notifier);
-    await screenRecordService.startRecording(game.gameId);
+    await screenRecordService.startRecording(game, matchId);
     _ref.read(activeMatchProvider.notifier).state = ActiveMatch(game: game, matchId: matchId);
 
     try {
@@ -31,10 +31,9 @@ class GameLauncherService {
         case 'android':
           final pkg = game.packageId;
           if (pkg != null && pkg.isNotEmpty) {
-            final isInstalled = await DeviceApps.isAppInstalled(pkg);
+            final isInstalled = await InstalledApps.isAppInstalled(pkg);
             if (isInstalled) {
-              DeviceApps.openApp(pkg);
-              _monitorAppClosure(game);
+              InstalledApps.startApp(pkg);
             } else {
               final playUrl = 'https://play.google.com/store/apps/details?id=$pkg';
               final ok = await launchUrlString(playUrl, mode: LaunchMode.externalApplication);
@@ -55,19 +54,6 @@ class GameLauncherService {
     } catch (e) {
       _toast(context, 'Launch failed: $e');
     }
-  }
-
-  void _monitorAppClosure(GameModel game) {
-    // This is a simplified implementation. A more robust solution would
-    // involve a background service that monitors running apps.
-    // Timer.periodic(const Duration(seconds: 5), (timer) async {
-    //   final isRunning = await DeviceApps.isAppInstalled(game.packageId!);
-    //   if (!isRunning) {
-    //     final screenRecordService = _ref.read(screenRecordServiceProvider.notifier);
-    //     screenRecordService.stopRecordingAndProcess(game, _ref.read(activeMatchProvider)!.matchId);
-    //     timer.cancel();
-    //   }
-    // });
   }
 
   void _toast(BuildContext context, String msg) {

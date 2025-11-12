@@ -73,6 +73,9 @@ class _VerzusAppState extends ConsumerState<VerzusApp> {
               ref.read(screenRecordServiceProvider.notifier).stopRecordingAndProcess(activeMatch.game, activeMatch.matchId);
               ref.read(activeMatchProvider.notifier).state = null;
             }
+          } else if (receivedAction.payload != null && receivedAction.payload!['matchId'] != null) {
+            final matchId = receivedAction.payload!['matchId'];
+            ref.read(routerProvider).go('/results/$matchId');
           }
         },
       );
