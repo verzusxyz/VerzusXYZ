@@ -10,18 +10,45 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:verzus/services/score_parsers/score_parser_interface.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'dart:async';
+import 'package:native_screenshot/native_screenshot.dart';
+import 'package:path_provider/path_provider.dart';
 
 
-class ScreenRecordService extends StateNotifier<bool> {
-  ScreenRecordService() : super(false);
+const List<String> endGameKeywords = [
+  "Game Over", "Match Over", "You Win", "You Lose", "Victory",
+  "Defeat", "Draw", "Results", "Final Score", "End of Match",
+  "KO", "Finished", "Round Complete", "Complete", "Mission Complete",
+  "Level Cleared", "Time Up", "Results Screen", "Winner", "Loser"
+];
 
-  Future<void> startRecording(String gameId) async {
-    if (state) {
+const List<String> variantKeywords = [
+  "Win!", "Lose!", "Top Score", "Champion", "MVP",
+  "Ranked Result", "XP Earned", "Scoreboard", "Replay", "Next Match"
+];
+
+const List<String> negativeKeywords = [
+  "Pause", "Resume", "Retry", "Next Level", "Continue",
+  "Options", "Settings", "Loading", "Connecting", "Waiting for Players"
+];
+
+
+enum RecordingState { idle, recording, verifying, processing }
+
+class ScreenRecordService extends StateNotifier<RecordingState> {
+  ScreenRecordService() : super(RecordingState.idle);
+
+  Timer? _frameAnalysisTimer;
+
+  Future<void> startRecording(GameModel game, String matchId) async {
+    if (state != RecordingState.idle) {
       return;
     }
     try {
-      state = await FlutterScreenRecording.startRecordScreen(gameId);
-      if (state) {
+      final success = await FlutterScreenRecording.startRecordScreen(game.gameId);
+      if (success) {
+        state = RecordingState.recording;
+        _frameAnalysisTimer = Timer.periodic(const Duration(seconds: 5), (_) => _analyzeFrame(game, matchId));
         _showRecordingNotification();
       }
     } catch (e) {
@@ -30,15 +57,70 @@ class ScreenRecordService extends StateNotifier<bool> {
   }
 
   Future<void> stopRecordingAndProcess(GameModel game, String matchId) async {
-    if (!state) {
+    if (state == RecordingState.idle || state == RecordingState.processing) {
       return;
     }
+    _frameAnalysisTimer?.cancel();
     final String? videoPath = await FlutterScreenRecording.stopRecordScreen;
-    state = false;
+    state = RecordingState.processing;
     AwesomeNotifications().dismiss(1);
 
     if (videoPath != null) {
-      await _processAndUploadResults(videoPath, game, matchId);
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: videoPath,
+        imageFormat: ImageFormat.PNG,
+      );
+      if (thumbnailPath != null) {
+        await _processAndUploadResults(videoPath, game, matchId, thumbnailPath);
+      } else {
+        await _flagForManualReview(matchId, 'Thumbnail generation failed.');
+      }
+    }
+    state = RecordingState.idle;
+  }
+
+  Future<void> _analyzeFrame(GameModel game, String matchId) async {
+    if (state != RecordingState.recording) {
+      return;
+    }
+
+    try {
+      final imagePath = await _captureFrame();
+      if (imagePath == null) {
+        return;
+      }
+
+      final ocrText = await _performOcr(imagePath, game.ocrEngine);
+      if (ocrText == null || ocrText.isEmpty) {
+        return;
+      }
+
+      final lowerCaseOcrText = ocrText.toLowerCase();
+      final hasEndGameKeyword = endGameKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+      final hasVariantKeyword = variantKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+      final hasNegativeKeyword = negativeKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+
+      if ((hasEndGameKeyword || hasVariantKeyword) && !hasNegativeKeyword) {
+        state = RecordingState.verifying;
+        // In a real implementation, we would check the next frame for stability.
+        // For now, we will just wait a second and then stop the recording.
+        await Future.delayed(const Duration(seconds: 1));
+        if (state == RecordingState.verifying) {
+          stopRecordingAndProcess(game, matchId);
+        }
+      }
+    } catch (e) {
+      // TODO: Log error
+    }
+  }
+
+  Future<String?> _captureFrame() async {
+    try {
+      final imagePath = await NativeScreenshot.takeScreenshot();
+      return imagePath;
+    } catch (e) {
+      // TODO: Log error
+      return null;
     }
   }
 
@@ -60,19 +142,9 @@ class ScreenRecordService extends StateNotifier<bool> {
     );
   }
 
-  Future<void> _processAndUploadResults(String videoPath, GameModel game, String matchId) async {
+  Future<void> _processAndUploadResults(String videoPath, GameModel game, String matchId, String screenshotPath) async {
     try {
-      final thumbnailPath = await VideoThumbnail.thumbnailFile(
-        video: videoPath,
-        imageFormat: ImageFormat.PNG,
-      );
-
-      if (thumbnailPath == null) {
-        await _flagForManualReview(matchId, 'Thumbnail generation failed.');
-        return;
-      }
-
-      final ocrText = await _performOcr(thumbnailPath, game.ocrEngine);
+      final ocrText = await _performOcr(screenshotPath, game.ocrEngine);
 
       if (ocrText == null || ocrText.isEmpty) {
         await _flagForManualReview(matchId, 'OCR failed to extract text.', videoPath: videoPath, thumbnailPath: thumbnailPath);
@@ -108,6 +180,16 @@ class ScreenRecordService extends StateNotifier<bool> {
       'status': 'processed',
       'processedAt': FieldValue.serverTimestamp(),
     });
+
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 2,
+        channelKey: 'basic_channel',
+        title: 'Match Finished 🎯',
+        body: 'Results captured — tap to review on VerzusXYZ',
+        payload: {'matchId': matchId},
+      ),
+    );
   }
 
   Future<void> _flagForManualReview(String matchId, String reason, {String? videoPath, String? thumbnailPath}) async {
