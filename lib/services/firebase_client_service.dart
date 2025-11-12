@@ -226,6 +226,19 @@ class FirebaseClientService {
 
   /// ==== GAME MANAGEMENT ====
   
+  /// Create a new game result
+  Future<String> createGameResult(Map<String, dynamic> resultData) async {
+    try {
+      final resultRef = _firestore.collection(FirestoreSchema.gameResults).doc();
+      resultData['id'] = resultRef.id;
+      resultData[GameResultDocument.createdAt] = FieldValue.serverTimestamp();
+      await resultRef.set(resultData);
+      return resultRef.id;
+    } catch (e) {
+      throw FirebaseClientException('Failed to create game result: ${e.toString()}');
+    }
+  }
+
   /// Add game to Firestore for reuse
   Future<String> addGame(GameModel game) async {
     try {

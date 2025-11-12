@@ -1,44 +1,24 @@
 import 'package:verzus/services/score_parsers/score_parser_interface.dart';
 
-class ScoreBasedMatchResult extends MatchResult {
-  final Map<String, int> scores;
-  final String winner;
-
-  ScoreBasedMatchResult({required this.scores, required this.winner});
-
-  Map<String, dynamic> toJson() {
-    return {
-      'scores': scores,
-      'winner': winner,
-    };
-  }
-}
-
 class ScoreBasedParser implements ScoreParser {
   @override
-  MatchResult parse(String ocrText) {
-    // Simple implementation using regex to find scores next to player names.
+  ParsedMatchResult parse(String ocrText) {
+    // Simple implementation using regex to find scores.
+    // This assumes a simple "Player1: 10, Player2: 5" format.
     // This will need to be made more robust based on actual OCR output.
-    final scores = <String, int>{};
-    final lines = ocrText.split('\n');
-    for (final line in lines) {
-      final match = RegExp(r'(\w+)\s+(\d+)').firstMatch(line);
-      if (match != null) {
-        final playerName = match.group(1)!;
-        final score = int.tryParse(match.group(2)!) ?? 0;
-        scores[playerName] = score;
-      }
+    final scores = <int>[];
+    final matches = RegExp(r'(\d+)').allMatches(ocrText);
+    for (final match in matches) {
+      final score = int.tryParse(match.group(1)!) ?? 0;
+      scores.add(score);
     }
 
-    String winner = '';
-    int maxScore = 0;
-    scores.forEach((player, score) {
-      if (score > maxScore) {
-        maxScore = score;
-        winner = player;
-      }
-    });
-
-    return ScoreBasedMatchResult(scores: scores, winner: winner);
+    if (scores.length >= 2) {
+      return ParsedMatchResult(player1Score: scores[0], player2Score: scores[1]);
+    } else if (scores.length == 1) {
+      return ParsedMatchResult(player1Score: scores[0]);
+    } else {
+      return ParsedMatchResult();
+    }
   }
 }
