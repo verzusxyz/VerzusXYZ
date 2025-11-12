@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum GameResultType { scoreBased, winLoss, kdaBased }
+
 class GameModel {
   final String gameId;
   final String title;
@@ -17,6 +19,8 @@ class GameModel {
   final List<String> roomIdPatterns;
   final DateTime createdAt;
   final String? approvedBy;
+  final GameResultType resultType;
+  final String ocrEngine;
 
   const GameModel({
     required this.gameId,
@@ -35,6 +39,8 @@ class GameModel {
     this.roomIdPatterns = const [],
     required this.createdAt,
     this.approvedBy,
+    required this.resultType,
+    required this.ocrEngine,
   });
 
   factory GameModel.fromFirestore(DocumentSnapshot doc) {
@@ -58,6 +64,11 @@ class GameModel {
       roomIdPatterns: List<String>.from(data['roomIdPatterns'] ?? []),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       approvedBy: data['approvedBy'],
+      resultType: GameResultType.values.firstWhere(
+        (e) => e.name == data['resultType'],
+        orElse: () => GameResultType.winLoss,
+      ),
+      ocrEngine: data['ocrEngine'] ?? 'mlkit',
     );
   }
 
@@ -78,6 +89,8 @@ class GameModel {
       'roomIdPatterns': roomIdPatterns,
       'createdAt': Timestamp.fromDate(createdAt),
       'approvedBy': approvedBy,
+      'resultType': resultType.name,
+      'ocrEngine': ocrEngine,
     };
   }
 

@@ -1,20 +1,75 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:verzus/providers/active_match_provider.dart';
+import 'package:verzus/providers/screen_record_provider.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/brand_logo.dart';
 
-class MainWrapper extends StatefulWidget {
+class MainWrapper extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainWrapper({super.key, required this.child});
 
   @override
-  State<MainWrapper> createState() => _MainWrapperState();
+  ConsumerState<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends ConsumerState<MainWrapper> with WidgetsBindingObserver {
   bool _collapsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final isRecording = ref.read(screenRecordServiceProvider) == RecordingState.recording;
+      if (isRecording) {
+        _showStopRecordingDialog();
+      }
+    }
+  }
+
+  void _showStopRecordingDialog() {
+    final activeMatch = ref.read(activeMatchProvider);
+    if (activeMatch == null) {
+      // Don't show the dialog if there's no active match
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Stop Recording?'),
+        content: const Text('It looks like you have a recording in progress. Would you like to stop it and process the results?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(screenRecordServiceProvider.notifier).stopRecordingAndProcess(activeMatch.game, activeMatch.matchId);
+              ref.read(activeMatchProvider.notifier).state = null;
+              Navigator.of(context).pop();
+            },
+            child: const Text('Stop & Process'),
+          ),
+        ],
+      ),
+    );
+  }
 
   int _currentIndexFromPath(String? path) {
     switch (path) {
@@ -172,6 +227,47 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          Consumer(
+            builder: (context, ref, child) {
+              final isRecording = ref.watch(screenRecordServiceProvider) == RecordingState.recording;
+              if (isRecording) {
+                return Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (!collapsed)
+                        const Text(
+                          'Recording',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
+                        onPressed: () {
+                          final activeMatch = ref.read(activeMatchProvider);
+                          if (activeMatch != null) {
+                            ref.read(screenRecordServiceProvider.notifier).stopRecordingAndProcess(activeMatch.game, activeMatch.matchId);
+                            ref.read(activeMatchProvider.notifier).state = null;
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           _SidebarItem(
             icon: Icons.gamepad_rounded,
             label: 'Games',
