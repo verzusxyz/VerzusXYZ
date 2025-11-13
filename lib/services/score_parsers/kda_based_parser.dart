@@ -1,4 +1,4 @@
-import 'package:verzus/services/score_parsers/score_parser_interface.dart';
+import 'package.verzus/services/score_parsers/score_parser_interface.dart';
 
 class KdaBasedParser implements ScoreParser {
   @override

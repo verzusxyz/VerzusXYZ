@@ -249,18 +249,6 @@ class FirebaseClientService {
         .map((snapshot) => snapshot.docs.map((doc) => GameModel.fromFirestore(doc)).toList());
   }
 
-  /// Create a new game result
-  Future<String> createGameResult(Map<String, dynamic> result) async {
-    try {
-      final resultRef = _firestore.collection('game_results').doc();
-      result['id'] = resultRef.id;
-      await resultRef.set(result);
-      return resultRef.id;
-    } catch (e) {
-      throw FirebaseClientException('Failed to create game result: ${e.toString()}');
-    }
-  }
-
   /// ==== WALLET OPERATIONS ====
   
   /// Get user wallet
