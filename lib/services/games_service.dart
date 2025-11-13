@@ -124,8 +124,6 @@ class GamesService {
       roomIdPatterns: const [],
       createdAt: DateTime.now(),
       approvedBy: approvedBy,
-      resultType: GameResultType.winLoss,
-      ocrEngine: 'mlkit',
     );
 
     // If a game doc for this key already exists, just mark submission as merged

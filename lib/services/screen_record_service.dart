@@ -1,3 +1,143 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screen_recording/flutter_screen_recording.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:verzus/models/game_model.dart';
+import 'package:verzus/models/game_result_model.dart';
+import 'package:verzus/models/match_model.dart';
+import 'package:verzus/repositories/firebase_repository.dart';
+import 'package:verzus/repositories/game_result_repository.dart';
+import 'package:verzus/repositories/manual_review_repository.dart';
+import 'package:verzus/services/capture_service.dart';
+import 'package:verzus/services/firestore_storage_service.dart';
+import 'package:verzus/services/notification_service.dart';
+import 'package:verzus/services/ocr_service.dart';
+import 'package:verzus/services/score_parser_factory.dart';
+import 'package:verzus/services/score_parsers/score_parser_interface.dart';
+
+const List<String> endGameKeywords = [
+  "Game Over", "Match Over", "You Win", "You Lose", "Victory",
+  "Defeat", "Draw", "Results", "Final Score", "End of Match",
+  "KO", "Finished", "Round Complete", "Complete", "Mission Complete",
+  "Level Cleared", "Time Up", "Results Screen", "Winner", "Loser"
+];
+
+const List<String> variantKeywords = [
+  "Win!", "Lose!", "Top Score", "Champion", "MVP",
+  "Ranked Result", "XP Earned", "Scoreboard", "Replay", "Next Match"
+];
+
+const List<String> negativeKeywords = [
+  "Pause", "Resume", "Retry", "Next Level", "Continue",
+  "Options", "Settings", "Loading", "Connecting", "Waiting for Players"
+];
+
+enum RecordingState { idle, recording, verifying, processing }
+
+class ScreenRecordService extends StateNotifier<RecordingState> {
+  final MatchRepository _matchRepository;
+  final GameResultRepository _gameResultRepository;
+  final ManualReviewRepository _manualReviewRepository;
+  final OcrService _ocrService;
+  final FirestoreStorageService _storageService;
+  final NotificationService _notificationService;
+  final CaptureService _captureService;
+
+  ScreenRecordService({
+    required MatchRepository matchRepository,
+    required GameResultRepository gameResultRepository,
+    required ManualReviewRepository manualReviewRepository,
+    required OcrService ocrService,
+    required FirestoreStorageService storageService,
+    required NotificationService notificationService,
+    required CaptureService captureService,
+  })  : _matchRepository = matchRepository,
+        _gameResultRepository = gameResultRepository,
+        _manualReviewRepository = manualReviewRepository,
+        _ocrService = ocrService,
+        _storageService = storageService,
+        _notificationService = notificationService,
+        _captureService = captureService,
+        super(RecordingState.idle);
+
+  Timer? _frameAnalysisTimer;
+
+  Future<void> startRecording(GameModel game, String matchId) async {
+    if (state != RecordingState.idle) {
+      return;
+    }
+    try {
+      final success = await FlutterScreenRecording.startRecordScreen(game.gameId);
+      if (success) {
+        state = RecordingState.recording;
+        _frameAnalysisTimer = Timer.periodic(const Duration(seconds: 5), (_) => _analyzeFrame(game, matchId));
+        _notificationService.showRecordingNotification();
+      }
+    } catch (e) {
+      // TODO: Inform user that permission is required
+    }
+  }
+
+  Future<void> stopRecordingAndProcess(GameModel game, String matchId) async {
+    if (state == RecordingState.idle || state == RecordingState.processing) {
+      return;
+    }
+    _frameAnalysisTimer?.cancel();
+    final String? videoPath = await FlutterScreenRecording.stopRecordScreen;
+    state = RecordingState.processing;
+    _notificationService.dismissRecordingNotification();
+
+    if (videoPath != null) {
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: videoPath,
+        imageFormat: ImageFormat.PNG,
+      );
+      if (thumbnailPath != null) {
+        await _processAndUploadResults(videoPath, game, matchId, thumbnailPath);
+      } else {
+        final match = await _matchRepository.listenToMatch(matchId).first;
+        if (match != null) {
+          await _flagForManualReview(match, 'Thumbnail generation failed.');
+        }
+      }
+    }
+    state = RecordingState.idle;
+  }
+
+  Future<void> _analyzeFrame(GameModel game, String matchId) async {
+    if (state != RecordingState.recording) {
+      return;
+    }
+
+    try {
+      final imagePath = await _captureService.captureFrame();
+      if (imagePath == null) {
+        return;
+      }
+
+      final ocrText = await _ocrService.extractTextFromImage(imagePath, game.ocrEngine);
+      if (ocrText.isEmpty) {
+        return;
+      }
+
+      final lowerCaseOcrText = ocrText.toLowerCase();
+      final hasEndGameKeyword = endGameKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+      final hasVariantKeyword = variantKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+      final hasNegativeKeyword = negativeKeywords.any((keyword) => lowerCaseOcrText.contains(keyword.toLowerCase()));
+
+      if ((hasEndGameKeyword || hasVariantKeyword) && !hasNegativeKeyword) {
+        state = RecordingState.verifying;
+        await Future.delayed(const Duration(seconds: 1));
+        if (state == RecordingState.verifying) {
+          stopRecordingAndProcess(game, matchId);
+        }
+      }
+    } catch (e) {
+      // TODO: Log error
+    }
+  }
+
   Future<void> _processAndUploadResults(String videoPath, GameModel game, String matchId, String screenshotPath) async {
     try {
       final match = await _matchRepository.listenToMatch(matchId).first;
@@ -5,8 +145,8 @@
         throw Exception('Match not found');
       }
 
-      final ocrText = await _performOcr(screenshotPath, game.ocrEngine);
-      if (ocrText == null || ocrText.isEmpty) {
+      final ocrText = await _ocrService.extractTextFromImage(screenshotPath, game.ocrEngine);
+      if (ocrText.isEmpty) {
         await _flagForManualReview(match, 'OCR failed to extract text.', videoPath: videoPath, thumbnailPath: screenshotPath);
         return;
       }
@@ -14,7 +154,6 @@
       final parser = ScoreParserFactory.getParser(game);
       final parsedResult = parser.parse(ocrText);
 
-      // Determine winner
       String? winnerId;
       if (parsedResult.player1Score != null && parsedResult.player2Score != null) {
         if (parsedResult.player1Score! > parsedResult.player2Score!) {
@@ -37,33 +176,20 @@
 
       await _uploadResult(gameResult, videoPath, screenshotPath);
     } catch (e) {
-      // Since we don't have the match object here, we can't flag for manual review in the same way.
-      // For now, we will log the error. A more robust solution would be to pass the match object to this method.
       // TODO: Log error
     }
   }
 
   Future<void> _uploadResult(GameResultModel result, String videoPath, String thumbnailPath) async {
-    final storageRef = FirebaseStorage.instance.ref();
     final videoFile = File(videoPath);
     final thumbnailFile = File(thumbnailPath);
 
-    final videoUploadTask = storageRef.child('match_recordings/${result.matchId}.mp4').putFile(videoFile);
-    final thumbnailUploadTask = storageRef.child('match_thumbnails/${result.matchId}.png').putFile(thumbnailFile);
-
-    await Future.wait([videoUploadTask, thumbnailUploadTask]);
+    await _storageService.uploadFile('match_recordings/${result.matchId}.mp4', videoFile);
+    await _storageService.uploadFile('match_thumbnails/${result.matchId}.png', thumbnailFile);
 
     await _gameResultRepository.createGameResult(result);
 
-    AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: 2,
-        channelKey: 'basic_channel',
-        title: 'Match Finished 🎯',
-        body: 'Results captured — tap to review on VerzusXYZ',
-        payload: {'matchId': result.matchId},
-      ),
-    );
+    _notificationService.showResultNotification(result.matchId);
   }
 
   Future<void> _flagForManualReview(MatchModel match, String reason, {String? videoPath, String? thumbnailPath}) async {
@@ -71,20 +197,22 @@
     String? thumbnailUrl;
 
     if (videoPath != null) {
-      final storageRef = FirebaseStorage.instance.ref();
-      final videoFile = File(videoPath);
-      final videoUploadTask = await storageRef.child('match_recordings/${match.id}.mp4').putFile(videoFile);
-      videoUrl = await videoUploadTask.ref.getDownloadURL();
+      videoUrl = await _storageService.uploadFile('manual_reviews/${match.id}/video.mp4', File(videoPath));
     }
 
     if (thumbnailPath != null) {
-      final storageRef = FirebaseStorage.instance.ref();
-      final thumbnailFile = File(thumbnailPath);
-      final thumbnailUploadTask = await storageRef.child('match_thumbnails/${match.id}.png').putFile(thumbnailFile);
-      thumbnailUrl = await thumbnailUploadTask.ref.getDownloadURL();
+      thumbnailUrl = await _storageService.uploadFile('manual_reviews/${match.id}/thumbnail.png', File(thumbnailPath));
     }
 
-    // We are not creating a game result here, but we could create a "disputed" or "review" document in a separate collection.
-    // For now, we will just log the error.
-    // TODO: Implement a proper manual review system.
+    final review = ManualReviewModel(
+      id: '', // Will be generated by Firestore
+      matchId: match.id,
+      reason: reason,
+      videoUrl: videoUrl,
+      thumbnailUrl: thumbnailUrl,
+      createdAt: DateTime.now(),
+    );
+
+    await _manualReviewRepository.createManualReview(review);
   }
+}
