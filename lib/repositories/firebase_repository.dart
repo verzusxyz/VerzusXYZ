@@ -6,7 +6,6 @@ import 'package:verzus/models/user_model.dart';
 import 'package:verzus/models/match_model.dart';
 import 'package:verzus/models/game_model.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
-import 'package:verzus/repositories/manual_review_repository.dart';
 
 /// Repository pattern providers for Firebase data access
 final userRepositoryProvider = Provider<UserRepository>((ref) {

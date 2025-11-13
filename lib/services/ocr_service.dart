@@ -13,7 +13,7 @@ class OcrService {
       }
 
       if (ocrEngine == 'mlkit') {
-        final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+        final textRecognizer = TextRecognizer();
         final RecognizedText recognizedText = await textRecognizer.processImage(InputImage.fromFilePath(imagePath));
         return recognizedText.text;
       } else if (ocrEngine == 'tesseract') {
