@@ -252,8 +252,9 @@ class FirebaseClientService {
   /// Create a new game result
   Future<String> createGameResult(Map<String, dynamic> result) async {
     try {
-      final resultRef = _firestore.collection('game_results').doc();
+      final resultRef = _firestore.collection(FirestoreSchema.gameResults).doc();
       result['id'] = resultRef.id;
+      result[GameResultDocument.createdAt] = FieldValue.serverTimestamp();
       await resultRef.set(result);
       return resultRef.id;
     } catch (e) {
