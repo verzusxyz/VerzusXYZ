@@ -1,4 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package.cloud_firestore/cloud_firestore.dart';
+
+enum GameResultType {
+  scoreBased,
+  winLoss,
+  kdaBased,
+}
+
+enum GameResultType {
+  scoreBased,
+  winLoss,
+  kdaBased,
+}
 
 class GameModel {
   final String gameId;
@@ -18,7 +30,7 @@ class GameModel {
   final DateTime createdAt;
   final String? approvedBy;
   final GameResultType resultType;
-  final String ocrEngine; // 'mlkit' or 'tesseract'
+  final String ocrEngine; // mlkit or tesseract
 
   const GameModel({
     required this.gameId,
@@ -52,8 +64,8 @@ class GameModel {
       webUrl: data['webUrl'],
       iconUrl: data['iconUrl'],
       defaultCropData: data['defaultCropData'] != null
-        ? DefaultCropData.fromMap(data['defaultCropData'])
-        : null,
+          ? DefaultCropData.fromMap(data['defaultCropData'])
+          : null,
       autoGenEnabled: data['autoGenEnabled'] ?? true,
       popularityScore: (data['popularityScore'] ?? 0.0).toDouble(),
       supportsRoomUrl: data['supportsRoomUrl'] ?? false,
@@ -63,8 +75,8 @@ class GameModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       approvedBy: data['approvedBy'],
       resultType: GameResultType.values.firstWhere(
-        (e) => e.name == data['resultType'],
-        orElse: () => GameResultType.scoreBased,
+            (e) => e.name == data['resultType'],
+        orElse: () => GameResultType.winLoss,
       ),
       ocrEngine: data['ocrEngine'] ?? 'mlkit',
     );
@@ -73,8 +85,6 @@ class GameModel {
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,
-      'resultType': resultType.name,
-      'ocrEngine': ocrEngine,
       'platform': platform,
       'packageId': packageId,
       'bundleId': bundleId,
@@ -89,6 +99,8 @@ class GameModel {
       'roomIdPatterns': roomIdPatterns,
       'createdAt': Timestamp.fromDate(createdAt),
       'approvedBy': approvedBy,
+      'resultType': resultType.name,
+      'ocrEngine': ocrEngine,
     };
   }
 
@@ -257,12 +269,6 @@ class GameSubmissionModel {
       'reviewNotes': reviewNotes,
     };
   }
-}
-
-enum GameResultType {
-  scoreBased,
-  winLoss,
-  kdaBased,
 }
 
 enum GameSubmissionStatus {
