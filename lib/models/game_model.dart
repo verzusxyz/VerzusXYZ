@@ -17,6 +17,8 @@ class GameModel {
   final List<String> roomIdPatterns;
   final DateTime createdAt;
   final String? approvedBy;
+  final GameResultType resultType;
+  final String ocrEngine; // 'mlkit' or 'tesseract'
 
   const GameModel({
     required this.gameId,
@@ -35,6 +37,8 @@ class GameModel {
     this.roomIdPatterns = const [],
     required this.createdAt,
     this.approvedBy,
+    required this.resultType,
+    required this.ocrEngine,
   });
 
   factory GameModel.fromFirestore(DocumentSnapshot doc) {
@@ -58,12 +62,19 @@ class GameModel {
       roomIdPatterns: List<String>.from(data['roomIdPatterns'] ?? []),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       approvedBy: data['approvedBy'],
+      resultType: GameResultType.values.firstWhere(
+        (e) => e.name == data['resultType'],
+        orElse: () => GameResultType.scoreBased,
+      ),
+      ocrEngine: data['ocrEngine'] ?? 'mlkit',
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,
+      'resultType': resultType.name,
+      'ocrEngine': ocrEngine,
       'platform': platform,
       'packageId': packageId,
       'bundleId': bundleId,
@@ -246,6 +257,12 @@ class GameSubmissionModel {
       'reviewNotes': reviewNotes,
     };
   }
+}
+
+enum GameResultType {
+  scoreBased,
+  winLoss,
+  kdaBased,
 }
 
 enum GameSubmissionStatus {

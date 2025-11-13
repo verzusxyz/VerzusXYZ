@@ -1,6 +1,6 @@
 import 'package:verzus/services/score_parsers/score_parser_interface.dart';
 
-class KdaBasedParser implements ScoreParser {
+class KdaParser implements ScoreParser {
   @override
   ParsedMatchResult parse(String ocrText) {
     // This is a basic implementation and may need to be adjusted for specific games.
