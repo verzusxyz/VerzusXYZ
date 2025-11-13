@@ -17,7 +17,6 @@ class MatchEngine {
   MatchEngine(this.ref);
 
   final _fs = FirebaseFirestore.instance;
-  StreamSubscription? _captureSub;
 
   Future<void> startMatch(String matchId, {Map<String, dynamic>? captureCrops, int fps = 2}) async {
     final matchRef = _fs.collection(FirestoreSchema.matches).doc(matchId);
@@ -43,8 +42,8 @@ class MatchEngine {
         fps: fps,
         onFrame: (Uint8List bytes, int ts) async {
           // Optional: run lightweight OCR to extract score hints
-          final ocr = OCRService();
-          final candidates = await ocr.extractCandidatesFromPng(bytes);
+          final ocr = ref.read(ocrServiceProvider);
+          final candidates = await ocr.extractTextFromImage(bytes, 'mlkit');
           // For now we do not auto-update scores; the ResultTracker handles finalization.
           if (kDebugMode && candidates.isNotEmpty) {
             // ignore: avoid_print

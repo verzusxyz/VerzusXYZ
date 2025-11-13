@@ -44,22 +44,15 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
   final NotificationService _notificationService;
   final CaptureService _captureService;
 
-  ScreenRecordService({
-    required MatchRepository matchRepository,
-    required GameResultRepository gameResultRepository,
-    required ManualReviewRepository manualReviewRepository,
-    required OcrService ocrService,
-    required FirestoreStorageService storageService,
-    required NotificationService notificationService,
-    required CaptureService captureService,
-  })  : _matchRepository = matchRepository,
-        _gameResultRepository = gameResultRepository,
-        _manualReviewRepository = manualReviewRepository,
-        _ocrService = ocrService,
-        _storageService = storageService,
-        _notificationService = notificationService,
-        _captureService = captureService,
-        super(RecordingState.idle);
+  ScreenRecordService(
+    this._matchRepository,
+    this._gameResultRepository,
+    this._manualReviewRepository,
+    this._ocrService,
+    this._storageService,
+    this._notificationService,
+    this._captureService,
+  ) : super(RecordingState.idle);
 
   Timer? _frameAnalysisTimer;
 
@@ -68,7 +61,7 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
       return;
     }
     try {
-      final success = await FlutterScreenRecording.startRecordScreen(game.gameId);
+      final success = await _captureService.startRecording(game.gameId);
       if (success) {
         state = RecordingState.recording;
         _frameAnalysisTimer = Timer.periodic(const Duration(seconds: 5), (_) => _analyzeFrame(game, matchId));
@@ -84,15 +77,12 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
       return;
     }
     _frameAnalysisTimer?.cancel();
-    final String? videoPath = await FlutterScreenRecording.stopRecordScreen;
+    final String? videoPath = await _captureService.stopRecording();
     state = RecordingState.processing;
-    _notificationService.dismissRecordingNotification();
+    _notificationService.dismissRecording(1);
 
     if (videoPath != null) {
-      final thumbnailPath = await VideoThumbnail.thumbnailFile(
-        video: videoPath,
-        imageFormat: ImageFormat.PNG,
-      );
+      final thumbnailPath = await _captureService.generateVideoThumbnail(videoPath);
       if (thumbnailPath != null) {
         await _processAndUploadResults(videoPath, game, matchId, thumbnailPath);
       } else {
@@ -116,7 +106,7 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
         return;
       }
 
-      final ocrText = await _ocrService.extractTextFromImage(imagePath, game.ocrEngine);
+      final ocrText = await _ocrService.performOcr(imagePath, game.ocrEngine);
       if (ocrText.isEmpty) {
         return;
       }
@@ -145,7 +135,7 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
         throw Exception('Match not found');
       }
 
-      final ocrText = await _ocrService.extractTextFromImage(screenshotPath, game.ocrEngine);
+      final ocrText = await _ocrService.performOcr(screenshotPath, game.ocrEngine);
       if (ocrText.isEmpty) {
         await _flagForManualReview(match, 'OCR failed to extract text.', videoPath: videoPath, thumbnailPath: screenshotPath);
         return;
@@ -189,7 +179,7 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
 
     await _gameResultRepository.createGameResult(result);
 
-    _notificationService.showResultNotification(result.matchId);
+    _notificationService.showMatchFinished(result.matchId);
   }
 
   Future<void> _flagForManualReview(MatchModel match, String reason, {String? videoPath, String? thumbnailPath}) async {
