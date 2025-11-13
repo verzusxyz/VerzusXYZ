@@ -444,8 +444,8 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
             roomIdPatterns: const [],
             createdAt: now,
             approvedBy: null,
-            resultType: GameResultType.winLoss,
-            ocrEngine: 'mlkit',
+          resultType: GameResultType.winLoss,
+          ocrEngine: 'mlkit',
           );
           await service.upsertGameByCanonicalKey(game);
         }

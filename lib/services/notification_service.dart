@@ -38,4 +38,16 @@ class NotificationService {
   void dismissRecordingNotification() {
     _awesomeNotifications.dismiss(1);
   }
+
+  void showMatchFinished(String matchId) {
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 3,
+        channelKey: 'basic_channel',
+        title: 'Match Finished!',
+        body: 'Your match has finished. Tap to see the results.',
+        payload: {'matchId': matchId},
+      ),
+    );
+  }
 }
