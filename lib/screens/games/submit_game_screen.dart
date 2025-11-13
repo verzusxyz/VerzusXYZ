@@ -319,7 +319,7 @@ import 'package:go_router/go_router.dart';
 import 'package:verzus/models/game_model.dart';
 import 'package:verzus/services/app_detection_service.dart';
 import 'package:verzus/services/games_service.dart';
-import 'package:verzus/services/game_launcher.dart';
+import 'package:verzus/providers/game_launcher_provider.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -408,7 +408,7 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
     );
 
     final matchId = FirebaseFirestore.instance.collection('matches').doc().id;
-    ref.read(gameLauncherServiceProvider).launchGame(context, game, matchId);
+    ref.read(gameLauncherServiceProvider).launchGame(context, game);
   }
 
   Future<void> _submit() async {
@@ -444,6 +444,8 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
             roomIdPatterns: const [],
             createdAt: now,
             approvedBy: null,
+          resultType: GameResultType.winLoss,
+          ocrEngine: 'mlkit',
           );
           await service.upsertGameByCanonicalKey(game);
         }

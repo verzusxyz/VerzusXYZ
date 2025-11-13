@@ -38,6 +38,11 @@ final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
   return GameResultRepository(firebaseClient);
 });
 
+final manualReviewRepositoryProvider = Provider<ManualReviewRepository>((ref) {
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return ManualReviewRepository(firebaseClient);
+});
+
 /// Base repository with common Firebase operations
 abstract class BaseRepository {
   final FirebaseClientService firebaseClient;
