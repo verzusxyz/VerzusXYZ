@@ -6,6 +6,7 @@ import 'package:verzus/models/user_model.dart';
 import 'package:verzus/models/match_model.dart';
 import 'package:verzus/models/game_model.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
+import 'package:verzus/repositories/manual_review_repository.dart';
 
 /// Repository pattern providers for Firebase data access
 final userRepositoryProvider = Provider<UserRepository>((ref) {
@@ -36,6 +37,11 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
 final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
   final firebaseClient = ref.read(firebaseClientServiceProvider);
   return GameResultRepository(firebaseClient);
+});
+
+final manualReviewRepositoryProvider = Provider<ManualReviewRepository>((ref) {
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return ManualReviewRepository(firebaseClient);
 });
 
 /// Base repository with common Firebase operations

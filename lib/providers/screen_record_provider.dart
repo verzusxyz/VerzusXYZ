@@ -5,7 +5,6 @@ import 'package:verzus/providers/notification_service_provider.dart';
 import 'package:verzus/providers/ocr_service_provider.dart';
 import 'package:verzus/repositories/firebase_repository.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
-import 'package:verzus/repositories/manual_review_repository.dart';
 import 'package:verzus/services/screen_record_service.dart';
 
 final screenRecordServiceProvider = StateNotifierProvider<ScreenRecordService, RecordingState>((ref) {
