@@ -6,6 +6,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:verzus/models/game_model.dart';
 import 'package:verzus/models/game_result_model.dart';
 import 'package:verzus/models/match_model.dart';
+import 'package:verzus/models/manual_review_model.dart';
 import 'package:verzus/repositories/firebase_repository.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
 import 'package:verzus/repositories/manual_review_repository.dart';
@@ -175,6 +176,7 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
       );
 
       await _uploadResult(gameResult, videoPath, screenshotPath);
+      _notificationService.showMatchFinished(matchId);
     } catch (e) {
       // TODO: Log error
     }
