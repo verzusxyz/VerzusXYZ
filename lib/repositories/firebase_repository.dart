@@ -33,7 +33,7 @@ final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   return WalletRepository(firebaseClient);
 });
 
-final gameResultRepositoryProvider = Provider((ref) {
+final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
   final firebaseClient = ref.read(firebaseClientServiceProvider);
   return GameResultRepository(firebaseClient);
 });
