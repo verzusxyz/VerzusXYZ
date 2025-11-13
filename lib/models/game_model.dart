@@ -6,6 +6,12 @@ enum GameResultType {
   kdaBased,
 }
 
+enum GameResultType {
+  scoreBased,
+  winLoss,
+  kdaBased,
+}
+
 class GameModel {
   final String gameId;
   final String title;
