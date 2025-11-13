@@ -407,8 +407,7 @@ class _SubmitGameScreenState extends ConsumerState<SubmitGameScreen> {
       ocrEngine: 'mlkit',
     );
 
-    final matchId = FirebaseFirestore.instance.collection('matches').doc().id;
-    ref.read(gameLauncherServiceProvider).launchGame(context, game, matchId);
+    ref.read(gameLauncherServiceProvider).launchGame(context, game, 'placeholder_match_id');
   }
 
   Future<void> _submit() async {
