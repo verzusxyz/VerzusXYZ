@@ -11,9 +11,9 @@ import 'package:verzus/repositories/firebase_repository.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
 import 'package:verzus/repositories/manual_review_repository.dart';
 import 'package:verzus/services/capture_service.dart';
-import 'package:verzus/services/firestore_storage_service.dart';
 import 'package:verzus/services/notification_service.dart';
 import 'package:verzus/services/ocr_service.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:verzus/services/score_parser_factory.dart';
 import 'package:verzus/services/score_parsers/score_parser_interface.dart';
 
@@ -41,26 +41,18 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
   final GameResultRepository _gameResultRepository;
   final ManualReviewRepository _manualReviewRepository;
   final OcrService _ocrService;
-  final FirestoreStorageService _storageService;
   final NotificationService _notificationService;
   final CaptureService _captureService;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  ScreenRecordService({
-    required MatchRepository matchRepository,
-    required GameResultRepository gameResultRepository,
-    required ManualReviewRepository manualReviewRepository,
-    required OcrService ocrService,
-    required FirestoreStorageService storageService,
-    required NotificationService notificationService,
-    required CaptureService captureService,
-  })  : _matchRepository = matchRepository,
-        _gameResultRepository = gameResultRepository,
-        _manualReviewRepository = manualReviewRepository,
-        _ocrService = ocrService,
-        _storageService = storageService,
-        _notificationService = notificationService,
-        _captureService = captureService,
-        super(RecordingState.idle);
+  ScreenRecordService(
+    this._matchRepository,
+    this._gameResultRepository,
+    this._manualReviewRepository,
+    this._ocrService,
+    this._notificationService,
+    this._captureService,
+  ) : super(RecordingState.idle);
 
   Timer? _frameAnalysisTimer;
 
@@ -186,12 +178,19 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
     final videoFile = File(videoPath);
     final thumbnailFile = File(thumbnailPath);
 
-    await _storageService.uploadFile('match_recordings/${result.matchId}.mp4', videoFile);
-    await _storageService.uploadFile('match_thumbnails/${result.matchId}.png', thumbnailFile);
+    await _uploadFile('match_recordings/${result.matchId}.mp4', videoFile);
+    await _uploadFile('match_thumbnails/${result.matchId}.png', thumbnailFile);
 
     await _gameResultRepository.createGameResult(result);
 
     _notificationService.showResultNotification(result.matchId);
+  }
+
+  Future<String> _uploadFile(String path, File file) async {
+    final ref = _storage.ref().child(path);
+    final uploadTask = ref.putFile(file);
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
   }
 
   Future<void> _flagForManualReview(MatchModel match, String reason, {String? videoPath, String? thumbnailPath}) async {
@@ -199,11 +198,11 @@ class ScreenRecordService extends StateNotifier<RecordingState> {
     String? thumbnailUrl;
 
     if (videoPath != null) {
-      videoUrl = await _storageService.uploadFile('manual_reviews/${match.id}/video.mp4', File(videoPath));
+      videoUrl = await _uploadFile('manual_reviews/${match.id}/video.mp4', File(videoPath));
     }
 
     if (thumbnailPath != null) {
-      thumbnailUrl = await _storageService.uploadFile('manual_reviews/${match.id}/thumbnail.png', File(thumbnailPath));
+      thumbnailUrl = await _uploadFile('manual_reviews/${match.id}/thumbnail.png', File(thumbnailPath));
     }
 
     final review = ManualReviewModel(
