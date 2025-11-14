@@ -4,11 +4,11 @@ import 'package:verzus/providers/firestore_storage_service_provider.dart';
 import 'package:verzus/providers/notification_service_provider.dart';
 import 'package:verzus/providers/ocr_service_provider.dart';
 import 'package:verzus/repositories/firebase_repository.dart';
-import 'package:verzus/repositories/game_result_repository.dart';
-import 'package:verzus/repositories/manual_review_repository.dart';
 import 'package:verzus/services/screen_record_service.dart';
+import 'package:verzus/repositories/manual_review_repository.dart';
 
-final screenRecordServiceProvider = StateNotifierProvider<ScreenRecordService, RecordingState>((ref) {
+final screenRecordServiceProvider =
+    StateNotifierProvider<ScreenRecordService, RecordingState>((ref) {
   final matchRepository = ref.watch(matchRepositoryProvider);
   final gameResultRepository = ref.watch(gameResultRepositoryProvider);
   final manualReviewRepository = ref.watch(manualReviewRepositoryProvider);
