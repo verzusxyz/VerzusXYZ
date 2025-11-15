@@ -41,7 +41,7 @@ final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
 /// Base repository with common Firebase operations
 abstract class BaseRepository {
   final FirebaseClientService firebaseClient;
-  
+
   BaseRepository(this.firebaseClient);
   
   /// Get current timestamp for Firestore
@@ -56,17 +56,17 @@ abstract class BaseRepository {
 /// User repository for user-related Firebase operations
 class UserRepository extends BaseRepository {
   UserRepository(super.firebaseClient);
-  
+
   /// Get user profile
   Future<UserModel?> getUserProfile(String uid) async {
     return await firebaseClient.getUserProfile(uid);
   }
-  
+
   /// Update user profile
   Future<void> updateUserProfile(String uid, Map<String, dynamic> updates) async {
     return await firebaseClient.updateUserProfile(uid, updates);
   }
-  
+
   /// Search users
   Future<List<UserModel>> searchUsers(String searchTerm, {int limit = 10}) async {
     return await firebaseClient.searchUsers(searchTerm, limit: limit);
@@ -134,12 +134,12 @@ class UserRepository extends BaseRepository {
 /// Match repository for match-related Firebase operations
 class MatchRepository extends BaseRepository {
   MatchRepository(super.firebaseClient);
-  
+
   /// Create match
   Future<String> createMatch(MatchModel match) async {
     return await firebaseClient.createMatch(match);
   }
-  
+
   /// Join match
   Future<void> joinMatch(String matchId, String userId) async {
     return await firebaseClient.joinMatch(matchId, userId);
@@ -163,7 +163,7 @@ class MatchRepository extends BaseRepository {
       gameData: gameData,
     );
   }
-  
+
   /// Get available matches
   Stream<List<MatchModel>> getAvailableMatches({
     String? skillTopic,
@@ -183,12 +183,12 @@ class MatchRepository extends BaseRepository {
       return snapshot.docs.map((doc) => MatchModel.fromFirestore(doc)).toList();
     });
   }
-  
+
   /// Get user matches
   Stream<List<MatchModel>> getUserMatches(String userId, {int limit = 50}) {
     return firebaseClient.getUserMatches(userId, limit: limit);
   }
-  
+
   /// Listen to specific match
   Stream<MatchModel?> listenToMatch(String matchId) {
     return firebaseClient.listenToMatch(matchId);
@@ -215,12 +215,12 @@ class MatchRepository extends BaseRepository {
 /// Tournament repository for tournament-related Firebase operations
 class TournamentRepository extends BaseRepository {
   TournamentRepository(super.firebaseClient);
-  
+
   /// Create tournament
   Future<String> createTournament(Map<String, dynamic> tournament) async {
     return await firebaseClient.createTournament(tournament);
   }
-  
+
   /// Join tournament
   Future<void> joinTournament(String tournamentId, String userId) async {
     return await firebaseClient.joinTournament(tournamentId, userId);
@@ -248,7 +248,7 @@ class TournamentRepository extends BaseRepository {
       return snapshot.docs.map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id}).toList();
     });
   }
-  
+
   /// Get tournament participants
   Stream<List<Map<String, dynamic>>> getTournamentParticipants(String tournamentId) {
     return firebaseClient.firestore
@@ -258,7 +258,7 @@ class TournamentRepository extends BaseRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id}).toList());
   }
-  
+
   /// Update tournament status
   Future<void> updateTournamentStatus(String tournamentId, String status) async {
     try {
@@ -278,12 +278,12 @@ class TournamentRepository extends BaseRepository {
 /// Game repository for game-related Firebase operations
 class GameRepository extends BaseRepository {
   GameRepository(super.firebaseClient);
-  
+
   /// Add game
   Future<String> addGame(GameModel game) async {
     return await firebaseClient.addGame(game);
   }
-  
+
   /// Get games
   Stream<List<GameModel>> getGames({int limit = 50}) {
     return firebaseClient.getGames(limit: limit);
@@ -299,7 +299,7 @@ class GameRepository extends BaseRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => GameModel.fromFirestore(doc)).toList());
   }
-  
+
   /// Search games
   Future<List<GameModel>> searchGames(String searchTerm, {int limit = 10}) async {
     try {
@@ -309,13 +309,13 @@ class GameRepository extends BaseRepository {
           .where('title', isLessThanOrEqualTo: '$searchTerm\uf8ff')
           .limit(limit)
           .get();
-      
+
       return query.docs.map((doc) => GameModel.fromFirestore(doc)).toList();
     } catch (e) {
       throw RepositoryException('Failed to search games: ${e.toString()}');
     }
   }
-  
+
   /// Update game popularity
   Future<void> updateGamePopularity(String gameId, int popularityScore) async {
     try {
@@ -335,12 +335,12 @@ class GameRepository extends BaseRepository {
 /// Wallet repository for wallet-related Firebase operations
 class WalletRepository extends BaseRepository {
   WalletRepository(super.firebaseClient);
-  
+
   /// Get user wallet
   Future<Map<String, dynamic>?> getUserWallet(String userId) async {
     return await firebaseClient.getUserWallet(userId);
   }
-  
+
   /// Listen to wallet updates
   Stream<Map<String, dynamic>?> listenToWallet(String userId) {
     return firebaseClient.listenToWallet(userId);
@@ -368,7 +368,7 @@ class WalletRepository extends BaseRepository {
       externalTransactionId: externalTransactionId,
     );
   }
-  
+
   /// Get user transactions
   Stream<List<Map<String, dynamic>>> getUserTransactions(String userId, {int limit = 50}) {
     return firebaseClient.firestore

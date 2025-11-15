@@ -74,7 +74,7 @@ class FirestoreService {
         MatchDocument.status: status,
         MatchDocument.updatedAt: FieldValue.serverTimestamp(),
       };
-      
+
       if (winnerId != null) updates[MatchDocument.winnerId] = winnerId;
       if (loserId != null) updates[MatchDocument.loserId] = loserId;
       if (status == FirestoreConstants.matchStatusCompleted) {
@@ -347,9 +347,9 @@ class FirestoreService {
 
 class FirestoreException implements Exception {
   final String message;
-  
+
   const FirestoreException(this.message);
-  
+
   @override
   String toString() => message;
 }

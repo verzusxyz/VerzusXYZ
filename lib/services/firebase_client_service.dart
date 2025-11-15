@@ -26,10 +26,10 @@ class FirebaseClientService {
   FirebaseStorage get storage => _storage;
 
   /// ==== USER MANAGEMENT ====
-  
+
   /// Get current authenticated user
   User? get currentUser => _auth.currentUser;
-  
+
   /// Auth state changes stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -62,7 +62,7 @@ class FirebaseClientService {
           .where(UserDocument.username, isLessThanOrEqualTo: '${searchTerm.toLowerCase()}\uf8ff')
           .limit(limit)
           .get();
-      
+
       return query.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
     } catch (e) {
       throw FirebaseClientException('Failed to search users: ${e.toString()}');
@@ -70,7 +70,7 @@ class FirebaseClientService {
   }
 
   /// ==== MATCH MANAGEMENT ====
-  
+
   /// Create a new match
   Future<String> createMatch(MatchModel match) async {
     try {
@@ -111,11 +111,11 @@ class FirebaseClientService {
       await _firestore.runTransaction((transaction) async {
         final matchRef = _firestore.collection(FirestoreSchema.matches).doc(matchId);
         final matchDoc = await transaction.get(matchRef);
-        
+
         if (!matchDoc.exists) {
           throw Exception('Match not found');
         }
-        
+
         final match = MatchModel.fromFirestore(matchDoc);
         if (match.status != FirestoreConstants.matchStatusActive) {
           throw Exception('Match is not active');
@@ -169,7 +169,7 @@ class FirebaseClientService {
   }
 
   /// ==== TOURNAMENT MANAGEMENT ====
-  
+
   /// Create tournament
   Future<String> createTournament(Map<String, dynamic> tournament) async {
     try {
@@ -225,7 +225,7 @@ class FirebaseClientService {
   }
 
   /// ==== GAME MANAGEMENT ====
-  
+
   /// Add game to Firestore for reuse
   Future<String> addGame(GameModel game) async {
     try {
@@ -263,7 +263,7 @@ class FirebaseClientService {
   }
 
   /// ==== WALLET OPERATIONS ====
-  
+
   /// Get user wallet
   Future<Map<String, dynamic>?> getUserWallet(String userId) async {
     try {
@@ -308,7 +308,7 @@ class FirebaseClientService {
   }
 
   /// ==== STORAGE OPERATIONS ====
-  
+
   /// Upload file to Firebase Storage
   Future<String> uploadFile(String path, Uint8List fileBytes, {String? contentType}) async {
     try {
@@ -333,7 +333,7 @@ class FirebaseClientService {
   }
 
   /// ==== LEADERBOARD OPERATIONS ====
-  
+
   /// Get leaderboard entries
   Stream<List<Map<String, dynamic>>> getLeaderboard({
     String? skillTopic,
@@ -376,7 +376,7 @@ class FirebaseClientService {
   }
 
   /// ==== SYSTEM OPERATIONS ====
-  
+
   /// Get system settings
   Future<Map<String, dynamic>?> getSystemSetting(String key) async {
     try {
@@ -398,22 +398,22 @@ class FirebaseClientService {
   }
 
   /// ==== BATCH OPERATIONS ====
-  
+
   /// Execute batch write
   Future<void> executeBatch(List<Map<String, dynamic>> operations) async {
     try {
       final batch = _firestore.batch();
-      
+
       for (final op in operations) {
         final type = op['type'] as String;
         final collection = op['collection'] as String;
         final docId = op['docId'] as String?;
         final data = op['data'] as Map<String, dynamic>?;
-        
-        final docRef = docId != null 
+
+        final docRef = docId != null
             ? _firestore.collection(collection).doc(docId)
             : _firestore.collection(collection).doc();
-        
+
         switch (type) {
           case 'set':
             batch.set(docRef, data!);
@@ -426,7 +426,7 @@ class FirebaseClientService {
             break;
         }
       }
-      
+
       await batch.commit();
     } catch (e) {
       throw FirebaseClientException('Failed to execute batch: ${e.toString()}');
@@ -434,7 +434,7 @@ class FirebaseClientService {
   }
 
   /// ==== REALTIME LISTENERS ====
-  
+
   /// Listen to match updates
   Stream<MatchModel?> listenToMatch(String matchId) {
     return _firestore
@@ -466,9 +466,9 @@ class FirebaseClientService {
 /// Firebase client exception
 class FirebaseClientException implements Exception {
   final String message;
-  
+
   const FirebaseClientException(this.message);
-  
+
   @override
   String toString() => message;
 }

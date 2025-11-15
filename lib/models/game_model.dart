@@ -5,7 +5,7 @@ class GameModel {
   final String title;
   final String platform; // android, ios, web
   final String? packageId; // for Android
-  final String? bundleId; // for iOS  
+  final String? bundleId; // for iOS
   final String? webUrl; // for web games
   final String? iconUrl;
   final DefaultCropData? defaultCropData;
