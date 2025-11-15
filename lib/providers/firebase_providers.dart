@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:verzus/services/firebase_client_service.dart';
 import 'package:verzus/repositories/firebase_repository.dart';
 import 'package:verzus/services/auth_service.dart';
 import 'package:verzus/models/user_model.dart';
@@ -13,8 +14,8 @@ final currentUserDataProvider = StreamProvider<UserModel?>((ref) {
   return authState.when(
     data: (user) {
       if (user == null) return Stream.value(null);
-      final authService = ref.read(authServiceProvider);
-      return authService.getUserStream(user.uid);
+      final userRepo = ref.read(userRepositoryProvider);
+      return userRepo.firebaseClient.listenToUser(user.uid);
     },
     loading: () => Stream.value(null),
     error: (_, __) => Stream.value(null),
@@ -86,14 +87,14 @@ final popularGamesProvider = StreamProvider<List<GameModel>>((ref) {
 
 /// Skill topics provider
 final skillTopicsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
-  final systemRepo = ref.read(systemRepositoryProvider);
-  return systemRepo.getSkillTopics();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return firebaseClient.getSkillTopics();
 });
 
 /// Leaderboard provider
 final leaderboardProvider = StreamProvider.family<List<Map<String, dynamic>>, String?>((ref, skillTopic) {
-  final leaderboardRepo = ref.read(leaderboardRepositoryProvider);
-  return leaderboardRepo.getLeaderboard(skillTopic: skillTopic);
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return firebaseClient.getLeaderboard(skillTopic: skillTopic);
 });
 
 /// User transactions provider
@@ -144,22 +145,22 @@ final gameSearchProvider = FutureProvider.family<List<GameModel>, String>((ref, 
 
 /// Platform fee rate provider
 final platformFeeRateProvider = FutureProvider<double>((ref) async {
-  final systemRepo = ref.read(systemRepositoryProvider);
-  final setting = await systemRepo.getSystemSetting('platform_fee_rate');
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  final setting = await firebaseClient.getSystemSetting('platform_fee_rate');
   return setting != null ? double.tryParse(setting['value'] ?? '0.10') ?? 0.10 : 0.10;
 });
 
 /// Minimum wager amount provider
 final minWagerAmountProvider = FutureProvider<double>((ref) async {
-  final systemRepo = ref.read(systemRepositoryProvider);
-  final setting = await systemRepo.getSystemSetting('min_wager_amount');
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  final setting = await firebaseClient.getSystemSetting('min_wager_amount');
   return setting != null ? double.tryParse(setting['value'] ?? '1.00') ?? 1.00 : 1.00;
 });
 
 /// Maximum wager amount provider
 final maxWagerAmountProvider = FutureProvider<double>((ref) async {
-  final systemRepo = ref.read(systemRepositoryProvider);
-  final setting = await systemRepo.getSystemSetting('max_wager_amount');
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  final setting = await firebaseClient.getSystemSetting('max_wager_amount');
   return setting != null ? double.tryParse(setting['value'] ?? '1000.00') ?? 1000.00 : 1000.00;
 });
 

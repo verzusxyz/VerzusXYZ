@@ -13,8 +13,6 @@ class ScoreParserFactory {
         return WinLossParser();
       case GameResultType.kdaBased:
         return KdaBasedParser();
-      default:
-        throw Exception('Unsupported result type: ${game.resultType}');
     }
   }
 }

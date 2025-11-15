@@ -6,48 +6,43 @@ import 'package:verzus/models/user_model.dart';
 import 'package:verzus/models/match_model.dart';
 import 'package:verzus/models/game_model.dart';
 import 'package:verzus/repositories/game_result_repository.dart';
-import 'package:verzus/repositories/manual_review_repository.dart';
 
 /// Repository pattern providers for Firebase data access
 final userRepositoryProvider = Provider<UserRepository>((ref) {
-  return UserRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return UserRepository(firebaseClient);
 });
 
 final matchRepositoryProvider = Provider<MatchRepository>((ref) {
-  return MatchRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return MatchRepository(firebaseClient);
 });
 
 final tournamentRepositoryProvider = Provider<TournamentRepository>((ref) {
-  return TournamentRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return TournamentRepository(firebaseClient);
 });
 
 final gameRepositoryProvider = Provider<GameRepository>((ref) {
-  return GameRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return GameRepository(firebaseClient);
 });
 
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
-  return WalletRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return WalletRepository(firebaseClient);
 });
 
 final gameResultRepositoryProvider = Provider<GameResultRepository>((ref) {
-  return GameResultRepository();
-});
-
-final manualReviewRepositoryProvider = Provider<ManualReviewRepository>((ref) {
-  return ManualReviewRepository();
-});
-
-final systemRepositoryProvider = Provider<SystemRepository>((ref) {
-  return SystemRepository();
-});
-
-final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((ref) {
-  return LeaderboardRepository();
+  final firebaseClient = ref.read(firebaseClientServiceProvider);
+  return GameResultRepository(firebaseClient);
 });
 
 /// Base repository with common Firebase operations
 abstract class BaseRepository {
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final FirebaseClientService firebaseClient;
+
+  BaseRepository(this.firebaseClient);
   
   /// Get current timestamp for Firestore
   Timestamp get currentTimestamp => Timestamp.now();
@@ -60,46 +55,27 @@ abstract class BaseRepository {
 
 /// User repository for user-related Firebase operations
 class UserRepository extends BaseRepository {
+  UserRepository(super.firebaseClient);
+
   /// Get user profile
   Future<UserModel?> getUserProfile(String uid) async {
-    try {
-      final doc = await firestore.collection(FirestoreSchema.users).doc(uid).get();
-      return doc.exists ? UserModel.fromFirestore(doc) : null;
-    } catch (e) {
-      throw RepositoryException('Failed to get user profile: ${e.toString()}');
-    }
+    return await firebaseClient.getUserProfile(uid);
   }
 
   /// Update user profile
   Future<void> updateUserProfile(String uid, Map<String, dynamic> updates) async {
-    try {
-      updates[UserDocument.updatedAt] = FieldValue.serverTimestamp();
-      await firestore.collection(FirestoreSchema.users).doc(uid).update(updates);
-    } catch (e) {
-      throw RepositoryException('Failed to update user profile: ${e.toString()}');
-    }
+    return await firebaseClient.updateUserProfile(uid, updates);
   }
 
   /// Search users
   Future<List<UserModel>> searchUsers(String searchTerm, {int limit = 10}) async {
-    try {
-      final query = await firestore
-          .collection(FirestoreSchema.users)
-          .where(UserDocument.username, isGreaterThanOrEqualTo: searchTerm.toLowerCase())
-          .where(UserDocument.username, isLessThanOrEqualTo: '${searchTerm.toLowerCase()}\uf8ff')
-          .limit(limit)
-          .get();
-
-      return query.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
-    } catch (e) {
-      throw RepositoryException('Failed to search users: ${e.toString()}');
-    }
+    return await firebaseClient.searchUsers(searchTerm, limit: limit);
   }
   
   /// Get user by username
   Future<UserModel?> getUserByUsername(String username) async {
     try {
-      final query = await firestore
+      final query = await firebaseClient.firestore
           .collection(FirestoreSchema.users)
           .where(UserDocument.username, isEqualTo: username.toLowerCase())
           .limit(1)
@@ -115,7 +91,7 @@ class UserRepository extends BaseRepository {
   /// Update user online status
   Future<void> updateOnlineStatus(String uid, bool isOnline) async {
     try {
-      await firestore
+      await firebaseClient.firestore
           .collection(FirestoreSchema.users)
           .doc(uid)
           .update({
@@ -140,7 +116,7 @@ class UserRepository extends BaseRepository {
       
       final List<UserModel> users = [];
       for (final chunk in chunks) {
-        final query = await firestore
+        final query = await firebaseClient.firestore
             .collection(FirestoreSchema.users)
             .where(FieldPath.documentId, whereIn: chunk)
             .get();
@@ -157,31 +133,16 @@ class UserRepository extends BaseRepository {
 
 /// Match repository for match-related Firebase operations
 class MatchRepository extends BaseRepository {
+  MatchRepository(super.firebaseClient);
+
   /// Create match
   Future<String> createMatch(MatchModel match) async {
-    try {
-      final matchRef = firestore.collection(FirestoreSchema.matches).doc();
-      final matchData = match.toFirestore();
-      matchData['id'] = matchRef.id;
-      await matchRef.set(matchData);
-      return matchRef.id;
-    } catch (e) {
-      throw RepositoryException('Failed to create match: ${e.toString()}');
-    }
+    return await firebaseClient.createMatch(match);
   }
 
   /// Join match
   Future<void> joinMatch(String matchId, String userId) async {
-    try {
-      await firestore.collection(FirestoreSchema.matches).doc(matchId).update({
-        MatchDocument.opponentId: userId,
-        MatchDocument.status: FirestoreConstants.matchStatusActive,
-        MatchDocument.startTime: FieldValue.serverTimestamp(),
-        MatchDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw RepositoryException('Failed to join match: ${e.toString()}');
-    }
+    return await firebaseClient.joinMatch(matchId, userId);
   }
   
   /// Submit match result
@@ -193,51 +154,14 @@ class MatchRepository extends BaseRepository {
     required int loserScore,
     Map<String, dynamic>? gameData,
   }) async {
-    try {
-      await firestore.runTransaction((transaction) async {
-        final matchRef = firestore.collection(FirestoreSchema.matches).doc(matchId);
-        final matchDoc = await transaction.get(matchRef);
-
-        if (!matchDoc.exists) {
-          throw Exception('Match not found');
-        }
-
-        final match = MatchModel.fromFirestore(matchDoc);
-        if (match.status != FirestoreConstants.matchStatusActive) {
-          throw Exception('Match is not active');
-        }
-
-        // Update match with results
-        transaction.update(matchRef, {
-          MatchDocument.winnerId: winnerId,
-          MatchDocument.loserId: loserId,
-          MatchDocument.creatorScore: match.creatorId == winnerId ? winnerScore : loserScore,
-          MatchDocument.opponentScore: match.creatorId == winnerId ? loserScore : winnerScore,
-          MatchDocument.status: FirestoreConstants.matchStatusCompleted,
-          MatchDocument.endTime: FieldValue.serverTimestamp(),
-          MatchDocument.gameData: gameData,
-          MatchDocument.updatedAt: FieldValue.serverTimestamp(),
-        });
-
-        // Update user statistics
-        final winnerRef = firestore.collection(FirestoreSchema.users).doc(winnerId);
-        final loserRef = firestore.collection(FirestoreSchema.users).doc(loserId);
-
-        transaction.update(winnerRef, {
-          UserDocument.totalWins: FieldValue.increment(1),
-          UserDocument.totalMatches: FieldValue.increment(1),
-          UserDocument.updatedAt: FieldValue.serverTimestamp(),
-        });
-
-        transaction.update(loserRef, {
-          UserDocument.totalLosses: FieldValue.increment(1),
-          UserDocument.totalMatches: FieldValue.increment(1),
-          UserDocument.updatedAt: FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      throw RepositoryException('Failed to submit match result: ${e.toString()}');
-    }
+    return await firebaseClient.submitMatchResult(
+      matchId: matchId,
+      winnerId: winnerId,
+      loserId: loserId,
+      winnerScore: winnerScore,
+      loserScore: loserScore,
+      gameData: gameData,
+    );
   }
 
   /// Get available matches
@@ -245,7 +169,7 @@ class MatchRepository extends BaseRepository {
     String? skillTopic,
     int limit = 20,
   }) {
-    Query query = firestore
+    Query query = firebaseClient.firestore
         .collection(FirestoreSchema.matches)
         .where(MatchDocument.status, isEqualTo: FirestoreConstants.matchStatusPending)
         .orderBy(MatchDocument.createdAt, descending: true)
@@ -262,31 +186,18 @@ class MatchRepository extends BaseRepository {
 
   /// Get user matches
   Stream<List<MatchModel>> getUserMatches(String userId, {int limit = 50}) {
-    return firestore
-        .collection(FirestoreSchema.matches)
-        .where(Filter.or(
-          Filter(MatchDocument.creatorId, isEqualTo: userId),
-          Filter(MatchDocument.opponentId, isEqualTo: userId),
-        ))
-        .orderBy(MatchDocument.createdAt, descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => MatchModel.fromFirestore(doc)).toList());
+    return firebaseClient.getUserMatches(userId, limit: limit);
   }
 
   /// Listen to specific match
   Stream<MatchModel?> listenToMatch(String matchId) {
-    return firestore
-        .collection(FirestoreSchema.matches)
-        .doc(matchId)
-        .snapshots()
-        .map((doc) => doc.exists ? MatchModel.fromFirestore(doc) : null);
+    return firebaseClient.listenToMatch(matchId);
   }
   
   /// Cancel match
   Future<void> cancelMatch(String matchId, String reason) async {
     try {
-      await firestore
+      await firebaseClient.firestore
           .collection(FirestoreSchema.matches)
           .doc(matchId)
           .update({
@@ -303,58 +214,16 @@ class MatchRepository extends BaseRepository {
 
 /// Tournament repository for tournament-related Firebase operations
 class TournamentRepository extends BaseRepository {
+  TournamentRepository(super.firebaseClient);
+
   /// Create tournament
   Future<String> createTournament(Map<String, dynamic> tournament) async {
-    try {
-      final tournamentRef = firestore.collection(FirestoreSchema.tournaments).doc();
-      tournament['id'] = tournamentRef.id;
-      tournament[TournamentDocument.createdAt] = FieldValue.serverTimestamp();
-      tournament[TournamentDocument.updatedAt] = FieldValue.serverTimestamp();
-      await tournamentRef.set(tournament);
-      return tournamentRef.id;
-    } catch (e) {
-      throw RepositoryException('Failed to create tournament: ${e.toString()}');
-    }
+    return await firebaseClient.createTournament(tournament);
   }
 
   /// Join tournament
   Future<void> joinTournament(String tournamentId, String userId) async {
-    try {
-      await firestore.runTransaction((transaction) async {
-        final tournamentRef = firestore.collection(FirestoreSchema.tournaments).doc(tournamentId);
-        final participantRef = firestore.collection(FirestoreSchema.tournamentParticipants).doc();
-
-        final tournamentDoc = await transaction.get(tournamentRef);
-        if (!tournamentDoc.exists) {
-          throw Exception('Tournament not found');
-        }
-
-        final tournament = tournamentDoc.data() as Map<String, dynamic>;
-        final currentParticipants = tournament[TournamentDocument.currentParticipants] ?? 0;
-        final maxParticipants = tournament[TournamentDocument.maxParticipants] ?? 0;
-
-        if (currentParticipants >= maxParticipants) {
-          throw Exception('Tournament is full');
-        }
-
-        // Add participant
-        transaction.set(participantRef, {
-          TournamentParticipantDocument.id: participantRef.id,
-          TournamentParticipantDocument.tournamentId: tournamentId,
-          TournamentParticipantDocument.userId: userId,
-          TournamentParticipantDocument.status: 'active',
-          TournamentParticipantDocument.joinedAt: FieldValue.serverTimestamp(),
-        });
-
-        // Update tournament participant count
-        transaction.update(tournamentRef, {
-          TournamentDocument.currentParticipants: FieldValue.increment(1),
-          TournamentDocument.updatedAt: FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      throw RepositoryException('Failed to join tournament: ${e.toString()}');
-    }
+    return await firebaseClient.joinTournament(tournamentId, userId);
   }
   
   /// Get tournaments
@@ -363,7 +232,7 @@ class TournamentRepository extends BaseRepository {
     String? skillTopic,
     int limit = 20,
   }) {
-    Query query = firestore
+    Query query = firebaseClient.firestore
         .collection(FirestoreSchema.tournaments)
         .orderBy(TournamentDocument.startDate, descending: false)
         .limit(limit);
@@ -382,7 +251,7 @@ class TournamentRepository extends BaseRepository {
 
   /// Get tournament participants
   Stream<List<Map<String, dynamic>>> getTournamentParticipants(String tournamentId) {
-    return firestore
+    return firebaseClient.firestore
         .collection(FirestoreSchema.tournamentParticipants)
         .where(TournamentParticipantDocument.tournamentId, isEqualTo: tournamentId)
         .orderBy(TournamentParticipantDocument.joinedAt)
@@ -393,7 +262,7 @@ class TournamentRepository extends BaseRepository {
   /// Update tournament status
   Future<void> updateTournamentStatus(String tournamentId, String status) async {
     try {
-      await firestore
+      await firebaseClient.firestore
           .collection(FirestoreSchema.tournaments)
           .doc(tournamentId)
           .update({
@@ -408,32 +277,21 @@ class TournamentRepository extends BaseRepository {
 
 /// Game repository for game-related Firebase operations
 class GameRepository extends BaseRepository {
+  GameRepository(super.firebaseClient);
+
   /// Add game
   Future<String> addGame(GameModel game) async {
-    try {
-      final gameRef = firestore.collection('games').doc();
-      final gameData = game.toFirestore();
-      gameData['gameId'] = gameRef.id;
-      await gameRef.set(gameData);
-      return gameRef.id;
-    } catch (e) {
-      throw RepositoryException('Failed to add game: ${e.toString()}');
-    }
+    return await firebaseClient.addGame(game);
   }
 
   /// Get games
   Stream<List<GameModel>> getGames({int limit = 50}) {
-    return firestore
-        .collection('games')
-        .orderBy('popularityScore', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => GameModel.fromFirestore(doc)).toList());
+    return firebaseClient.getGames(limit: limit);
   }
   
   /// Get popular games
   Stream<List<GameModel>> getPopularGames({int limit = 20}) {
-    return firestore
+    return firebaseClient.firestore
         .collection('games')
         .where('autoGenEnabled', isEqualTo: true)
         .orderBy('popularityScore', descending: true)
@@ -445,7 +303,7 @@ class GameRepository extends BaseRepository {
   /// Search games
   Future<List<GameModel>> searchGames(String searchTerm, {int limit = 10}) async {
     try {
-      final query = await firestore
+      final query = await firebaseClient.firestore
           .collection('games')
           .where('title', isGreaterThanOrEqualTo: searchTerm)
           .where('title', isLessThanOrEqualTo: '$searchTerm\uf8ff')
@@ -461,7 +319,7 @@ class GameRepository extends BaseRepository {
   /// Update game popularity
   Future<void> updateGamePopularity(String gameId, int popularityScore) async {
     try {
-      await firestore
+      await firebaseClient.firestore
           .collection('games')
           .doc(gameId)
           .update({
@@ -476,23 +334,16 @@ class GameRepository extends BaseRepository {
 
 /// Wallet repository for wallet-related Firebase operations
 class WalletRepository extends BaseRepository {
+  WalletRepository(super.firebaseClient);
+
   /// Get user wallet
   Future<Map<String, dynamic>?> getUserWallet(String userId) async {
-    try {
-      final doc = await firestore.collection(FirestoreSchema.wallets).doc(userId).get();
-      return doc.exists ? doc.data() as Map<String, dynamic> : null;
-    } catch (e) {
-      throw RepositoryException('Failed to get wallet: ${e.toString()}');
-    }
+    return await firebaseClient.getUserWallet(userId);
   }
 
   /// Listen to wallet updates
   Stream<Map<String, dynamic>?> listenToWallet(String userId) {
-    return firestore
-        .collection(FirestoreSchema.wallets)
-        .doc(userId)
-        .snapshots()
-        .map((doc) => doc.exists ? doc.data() as Map<String, dynamic> : null);
+    return firebaseClient.listenToWallet(userId);
   }
   
   /// Create wallet transaction
@@ -506,31 +357,21 @@ class WalletRepository extends BaseRepository {
     String? paymentMethod,
     String? externalTransactionId,
   }) async {
-    try {
-      final transactionRef = firestore.collection(FirestoreSchema.walletTransactions).doc();
-      await transactionRef.set({
-        WalletTransactionDocument.id: transactionRef.id,
-        WalletTransactionDocument.userId: userId,
-        WalletTransactionDocument.type: type,
-        WalletTransactionDocument.amount: amount,
-        WalletTransactionDocument.status: FirestoreConstants.transactionStatusPending,
-        WalletTransactionDocument.description: description,
-        WalletTransactionDocument.relatedMatchId: relatedMatchId,
-        WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
-        WalletTransactionDocument.paymentMethod: paymentMethod,
-        WalletTransactionDocument.externalTransactionId: externalTransactionId,
-        WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
-        WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
-      return transactionRef.id;
-    } catch (e) {
-      throw RepositoryException('Failed to create wallet transaction: ${e.toString()}');
-    }
+    return await firebaseClient.createWalletTransaction(
+      userId: userId,
+      type: type,
+      amount: amount,
+      description: description,
+      relatedMatchId: relatedMatchId,
+      relatedTournamentId: relatedTournamentId,
+      paymentMethod: paymentMethod,
+      externalTransactionId: externalTransactionId,
+    );
   }
 
   /// Get user transactions
   Stream<List<Map<String, dynamic>>> getUserTransactions(String userId, {int limit = 50}) {
-    return firestore
+    return firebaseClient.firestore
         .collection(FirestoreSchema.walletTransactions)
         .where(WalletTransactionDocument.userId, isEqualTo: userId)
         .orderBy(WalletTransactionDocument.createdAt, descending: true)
@@ -547,7 +388,7 @@ class WalletRepository extends BaseRepository {
   }) async {
     try {
       final increment = operation == 'add' ? amount : -amount;
-      await firestore
+      await firebaseClient.firestore
           .collection(FirestoreSchema.wallets)
           .doc(userId)
           .update({
@@ -568,49 +409,4 @@ class RepositoryException implements Exception {
   
   @override
   String toString() => message;
-}
-
-/// System repository for system-level Firebase operations
-class SystemRepository extends BaseRepository {
-  /// Get system settings
-  Future<Map<String, dynamic>?> getSystemSetting(String key) async {
-    try {
-      final doc = await firestore.collection(FirestoreSchema.systemSettings).doc(key).get();
-      return doc.exists ? doc.data() as Map<String, dynamic> : null;
-    } catch (e) {
-      throw RepositoryException('Failed to get system setting: ${e.toString()}');
-    }
-  }
-
-  /// Get all active skill topics
-  Stream<List<Map<String, dynamic>>> getSkillTopics() {
-    return firestore
-        .collection(FirestoreSchema.skillTopics)
-        .where(SkillTopicDocument.isActive, isEqualTo: true)
-        .orderBy(SkillTopicDocument.name)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id}).toList());
-  }
-}
-
-/// Leaderboard repository for leaderboard-related Firebase operations
-class LeaderboardRepository extends BaseRepository {
-  /// Get leaderboard entries
-  Stream<List<Map<String, dynamic>>> getLeaderboard({
-    String? skillTopic,
-    int limit = 100,
-  }) {
-    Query query = firestore
-        .collection(FirestoreSchema.leaderboardEntries)
-        .orderBy(LeaderboardEntryDocument.skillRating, descending: true)
-        .limit(limit);
-
-    if (skillTopic != null) {
-      query = query.where(LeaderboardEntryDocument.skillTopic, isEqualTo: skillTopic);
-    }
-
-    return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id}).toList();
-    });
-  }
 }

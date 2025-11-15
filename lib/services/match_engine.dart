@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/models/match_model.dart';
 import 'package:verzus/services/capture_bridge.dart';
-import 'package:verzus/providers/ocr_service_provider.dart';
+import 'package:verzus/services/ocr_service.dart';
 import 'package:verzus/services/result_tracker.dart';
 
 final matchEngineProvider = Provider<MatchEngine>((ref) => MatchEngine(ref));
@@ -17,7 +17,6 @@ class MatchEngine {
   MatchEngine(this.ref);
 
   final _fs = FirebaseFirestore.instance;
-  StreamSubscription? _captureSub;
 
   Future<void> startMatch(String matchId, {Map<String, dynamic>? captureCrops, int fps = 2}) async {
     final matchRef = _fs.collection(FirestoreSchema.matches).doc(matchId);
@@ -44,7 +43,7 @@ class MatchEngine {
         onFrame: (Uint8List bytes, int ts) async {
           // Optional: run lightweight OCR to extract score hints
           final ocr = ref.read(ocrServiceProvider);
-          final candidates = await ocr.extractTextFromImage(bytes);
+          final candidates = await ocr.extractTextFromImage(bytes, 'mlkit');
           // For now we do not auto-update scores; the ResultTracker handles finalization.
           if (kDebugMode && candidates.isNotEmpty) {
             // ignore: avoid_print
