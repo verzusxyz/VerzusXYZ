@@ -1,8 +1,12 @@
 import 'package:awesome_notifications/awesome_notifications.dart';
 
 class NotificationService {
+  final AwesomeNotifications _awesomeNotifications;
+
+  NotificationService(this._awesomeNotifications);
+
   void showRecordingNotification() {
-    AwesomeNotifications().createNotification(
+    _awesomeNotifications.createNotification(
       content: NotificationContent(
         id: 1,
         channelKey: 'basic_channel',
@@ -20,7 +24,7 @@ class NotificationService {
   }
 
   void showResultNotification(String matchId) {
-    AwesomeNotifications().createNotification(
+    _awesomeNotifications.createNotification(
       content: NotificationContent(
         id: 2,
         channelKey: 'basic_channel',
@@ -32,6 +36,18 @@ class NotificationService {
   }
 
   void dismissRecordingNotification() {
-    AwesomeNotifications().dismiss(1);
+    _awesomeNotifications.dismiss(1);
+  }
+
+  void showMatchFinished(String matchId) {
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 3,
+        channelKey: 'basic_channel',
+        title: 'Match Finished!',
+        body: 'Your match has finished. Tap to see the results.',
+        payload: {'matchId': matchId},
+      ),
+    );
   }
 }
