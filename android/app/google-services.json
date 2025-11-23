@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "132416276840",
+    "firebase_url": "https://verzusxyz-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "verzusxyz",
+    "storage_bucket": "verzusxyz.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:132416276840:android:5c8b48170f5d2d65872edd",
+        "android_client_info": {
+          "package_name": "aa.verzus.xyz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuSpo-25xm3o4yWUhWOh8bqLNkUnRq3lk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
