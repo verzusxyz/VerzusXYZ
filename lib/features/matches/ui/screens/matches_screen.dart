@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
+import 'package:verzus/features/games/data/models/game_model.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/matches/data/repositories/match_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
-import 'package:verzus/theme.dart';
+import 'package:verzus/services/walkthrough_service.dart';
+import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
+import 'package:verzus/widgets/verzus_text_field.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -22,10 +26,9 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   final TextEditingController _wagerController =
       TextEditingController(text: '5.00');
   String? _selectedGameId;
-  String? _selectedGameTitle;
-  final bool _isPrivate = false;
-  String _mode = 'Live'; // Live or Demo
-  final MatchFormat _format = MatchFormat.oneVOne; // 1v1, FFA, Team-based
+  GameModel? _selectedGame;
+  bool _isPrivate = false;
+  WalletKind _walletKind = WalletKind.live;
 
   @override
   void initState() {
@@ -42,43 +45,54 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
+    final theme = Theme.of(context);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Matches'),
-      ),
+      appBar: AppBar(title: const Text('Matches')),
       body: Column(
         children: [
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+            margin:
+                EdgeInsets.symmetric(horizontal: responsive.widthPercent(0.04)),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius:
+                  BorderRadius.circular(responsive.diagonalPercent(0.015)),
             ),
             child: TabBar(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'Join Match'),
-                Tab(text: 'Create Match'),
-                Tab(text: 'Live Matches'),
+              tabs: [
+                const Tab(text: 'Join Match'),
+                Tab(
+                  child: Showcase(
+                    key: walkthroughService!.createMatchKey,
+                    description: 'Tap here to create your own match!',
+                    child: const Text('Create Match'),
+                  ),
+                ),
+                const Tab(text: 'Live Matches'),
               ],
-              labelColor: VerzusColors.primaryPurple,
-              unselectedLabelColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
+              labelColor: theme.colorScheme.primary,
+              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
               indicator: BoxDecoration(
-                color: VerzusColors.primaryPurple.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                // ignore: deprecated_member_use
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius:
+                    BorderRadius.circular(responsive.diagonalPercent(0.012)),
               ),
               dividerColor: Colors.transparent,
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: responsive.heightPercent(0.025)),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildJoinMatches(),
-                _buildCreateMatchTab(),
-                _buildLiveMatches(),
+                _buildJoinMatches(responsive),
+                _buildCreateMatchTab(responsive),
+                _buildLiveMatches(responsive),
               ],
             ),
           ),
@@ -87,29 +101,27 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     );
   }
 
-  Widget _buildJoinMatches() {
+  Widget _buildJoinMatches(Responsive responsive) {
     final matchesStream =
         ref.watch(matchRepositoryProvider).getAvailableMatches();
     return StreamBuilder<List<MatchModel>>(
       stream: matchesStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingShimmer();
+          return _buildLoadingShimmer(responsive);
         }
-        if (snapshot.hasError) {
-          return _buildErrorNotice(snapshot.error!);
-        }
+        if (snapshot.hasError) return _buildErrorNotice(snapshot.error!);
         final matches = snapshot.data ?? [];
         if (matches.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.search_rounded,
-            title: 'No Open Matches',
-            subtitle:
-                'Be the first to create a match and challenge other players!',
-          );
+          return _buildEmptyState(responsive,
+              icon: Icons.search,
+              title: 'No Open Matches',
+              subtitle:
+                  'Be the first to create a match and challenge other players!');
         }
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding:
+              EdgeInsets.symmetric(horizontal: responsive.widthPercent(0.04)),
           itemCount: matches.length,
           itemBuilder: (context, index) {
             final match = matches[index];
@@ -120,50 +132,51 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     );
   }
 
-  Widget _buildCreateMatchTab() {
+  Widget _buildCreateMatchTab(Responsive responsive) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: responsive.widthPercent(0.04)),
       child: Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 40),
-        child: _buildCreateMatchForm(),
+        padding: EdgeInsets.only(
+            top: responsive.heightPercent(0.015),
+            bottom: responsive.heightPercent(0.05)),
+        child: _buildCreateMatchForm(responsive),
       ),
     );
   }
 
-  Widget _buildLiveMatches() {
-    // This can be re-implemented once the full feature is scoped.
-    return _buildEmptyState(
-      icon: Icons.live_tv_rounded,
-      title: 'No Live Matches',
-      subtitle:
-          'Live matches will appear here. You can place stakes on outcomes.',
-    );
+  Widget _buildLiveMatches(Responsive responsive) {
+    return _buildEmptyState(responsive,
+        icon: Icons.live_tv_rounded,
+        title: 'No Live Matches',
+        subtitle:
+            'Live matches will appear here. You can place stakes on outcomes.');
   }
 
-  Widget _buildCreateMatchForm() {
+  Widget _buildCreateMatchForm(Responsive responsive) {
     final gamesStream = ref.watch(gameRepositoryProvider).getGames();
-    final authUser = ref.watch(authRepositoryProvider).currentUser;
+    final theme = Theme.of(context);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(responsive.diagonalPercent(0.02)),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius:
+                BorderRadius.circular(responsive.diagonalPercent(0.015)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Create Match',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              StreamBuilder(
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: responsive.diagonalPercent(0.022))),
+              SizedBox(height: responsive.heightPercent(0.015)),
+              StreamBuilder<List<GameModel>>(
                 stream: gamesStream,
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
@@ -179,101 +192,63 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
                                   overflow: TextOverflow.ellipsis),
                             ))
                         .toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedGameId = val;
-                        _selectedGameTitle =
-                            games.firstWhere((g) => g.gameId == val).title;
-                      });
-                    },
+                    onChanged: (val) => setState(() {
+                      _selectedGameId = val;
+                      _selectedGame = games.firstWhere((g) => g.gameId == val);
+                    }),
                     decoration: InputDecoration(
                       labelText: 'Select Game',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(
+                              responsive.diagonalPercent(0.015))),
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: responsive.heightPercent(0.015)),
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _wagerController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: 'Entry Fee (USD)',
-                        prefixText: '\$',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                    child: Showcase(
+                      key: walkthroughService!.wagerFieldKey,
+                      description: 'Set your wager amount here.',
+                      child: VerzusTextField(
+                        controller: _wagerController,
+                        label: 'Entry Fee (USD)',
+                        prefixIcon: Text('\$'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  DropdownButton<String>(
-                    value: _mode,
+                  SizedBox(width: responsive.widthPercent(0.03)),
+                  DropdownButton<WalletKind>(
+                    value: _walletKind,
                     items: const [
-                      DropdownMenuItem(value: 'Live', child: Text('Live')),
-                      DropdownMenuItem(value: 'Demo', child: Text('Demo')),
+                      DropdownMenuItem(
+                          value: WalletKind.live, child: Text('Live')),
+                      DropdownMenuItem(
+                          value: WalletKind.demo, child: Text('Demo')),
                     ],
-                    onChanged: (v) => setState(() => _mode = v ?? 'Live'),
+                    onChanged: (v) =>
+                        setState(() => _walletKind = v ?? WalletKind.live),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: responsive.heightPercent(0.01)),
+              SwitchListTile(
+                title: Text('Private Match',
+                    style:
+                        TextStyle(fontSize: responsive.diagonalPercent(0.018))),
+                value: _isPrivate,
+                onChanged: (value) => setState(() => _isPrivate = value),
+                activeColor: theme.colorScheme.primary,
+              ),
+              SizedBox(height: responsive.heightPercent(0.015)),
               SizedBox(
                 width: double.infinity,
                 child: VerzusButton(
-                  onPressed: () async {
-                    if (authUser == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please sign in')));
-                      return;
-                    }
-                    final wager = double.tryParse(_wagerController.text) ?? 0.0;
-                    if (_selectedGameId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Select a game')));
-                      return;
-                    }
-                    try {
-                      final match = MatchModel(
-                        id: '', // Firestore will generate this
-                        creatorId: authUser.uid,
-                        skillTopic: _selectedGameTitle!,
-                        wagerAmount: wager,
-                        walletKind:
-                            _mode == 'Live' ? WalletKind.live : WalletKind.demo,
-                        matchFormat: _format,
-                        status: MatchStatus.pending,
-                        createdAt: DateTime.now(),
-                        updatedAt: DateTime.now(),
-                        gameData: {
-                          'game_id': _selectedGameId,
-                          'private': _isPrivate,
-                          'mode': _mode.toLowerCase(),
-                          'match_type': _format.name,
-                        },
-                      );
-                      await ref
-                          .read(matchRepositoryProvider)
-                          .createMatch(match);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Match created')),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Failed: $e'),
-                              backgroundColor: VerzusColors.dangerRed),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: _createMatch,
                   child: const Text('Create'),
                 ),
               ),
@@ -284,90 +259,123 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     );
   }
 
+  Future<void> _createMatch() async {
+    final authUser = ref.read(authRepositoryProvider).currentUser;
+    if (authUser == null) {
+      _showError('Please sign in');
+      return;
+    }
+    final wager = double.tryParse(_wagerController.text) ?? 0.0;
+    if (_selectedGame == null) {
+      _showError('Select a game');
+      return;
+    }
+    try {
+      final match = MatchModel(
+        id: '', // Firestore will generate this
+        creatorId: authUser.uid,
+        skillTopic: _selectedGame!.title,
+        wagerAmount: wager,
+        walletKind: _walletKind,
+        matchFormat: MatchFormat.oneVOne,
+        status: MatchStatus.pending,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        gameData: {
+          'game_id': _selectedGameId,
+          'private': _isPrivate,
+        },
+      );
+      await ref.read(matchRepositoryProvider).createMatch(match);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Match created')));
+      }
+    } catch (e) {
+      if (mounted) _showError('Failed: $e');
+    }
+  }
+
   Future<void> _joinMatch(String matchId) async {
     final authUser = ref.read(authRepositoryProvider).currentUser;
     if (authUser == null) return;
     try {
       await ref.read(matchRepositoryProvider).joinMatch(matchId, authUser.uid);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Joined match!')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Joined match!')));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to join: $e'),
-              backgroundColor: VerzusColors.dangerRed),
-        );
-      }
+      if (mounted) _showError('Failed to join: $e');
     }
   }
 
-  Widget _buildLoadingShimmer() {
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: Theme.of(context).colorScheme.error,
+    ));
+  }
+
+  Widget _buildLoadingShimmer(Responsive responsive) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: responsive.widthPercent(0.04)),
       itemCount: 5,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: VerzusShimmers.listTile(),
-        );
-      },
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+        child: VerzusShimmers.listTile(),
+      ),
     );
   }
 
   Widget _buildErrorNotice(Object error, {bool compact = false}) {
-    final message = error.toString();
+    final responsive = Responsive(context);
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(compact ? 8 : 16),
+        padding: EdgeInsets.all(compact
+            ? responsive.diagonalPercent(0.01)
+            : responsive.diagonalPercent(0.02)),
         child: Text(
-          message,
+          error.toString(),
           textAlign: TextAlign.center,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: Theme.of(context).colorScheme.error),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: responsive.diagonalPercent(0.018),
+              ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _buildEmptyState(Responsive responsive,
+      {required IconData icon,
+      required String title,
+      required String subtitle}) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+        padding: EdgeInsets.symmetric(
+            vertical: responsive.heightPercent(0.05),
+            horizontal: responsive.widthPercent(0.06)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurfaceVariant
-                  // ignore: deprecated_member_use
-                  .withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
+            Icon(icon,
+                size: responsive.diagonalPercent(0.08),
+                // ignore: deprecated_member_use
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5)),
+            SizedBox(height: responsive.heightPercent(0.02)),
+            Text(title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: responsive.diagonalPercent(0.022),
+                )),
+            SizedBox(height: responsive.heightPercent(0.01)),
+            Text(subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: responsive.diagonalPercent(0.018),
+                ),
+                textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -382,18 +390,19 @@ class _MatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final responsive = Responsive(context);
+    final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+      padding: EdgeInsets.all(responsive.diagonalPercent(0.018)),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(responsive.diagonalPercent(0.015)),
       ),
       child: Row(
         children: [
-          Icon(Icons.sports_esports_rounded, color: VerzusColors.primaryPurple),
-          const SizedBox(width: 12),
+          Icon(Icons.sports_esports_rounded, color: theme.colorScheme.primary),
+          SizedBox(width: responsive.widthPercent(0.03)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,17 +411,17 @@ class _MatchCard extends StatelessWidget {
                   match.skillTopic,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: responsive.diagonalPercent(0.019),
+                  ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: responsive.heightPercent(0.005)),
                 Text('Wager: \$${match.wagerAmount.toStringAsFixed(2)}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: responsive.diagonalPercent(0.016),
+                    )),
               ],
             ),
           ),

@@ -1,41 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:verzus/theme.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/services/walkthrough_service.dart';
+import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/brand_logo.dart';
+import 'package:verzus/widgets/recording_indicator.dart';
 
-class MainWrapper extends StatefulWidget {
+class MainWrapper extends ConsumerStatefulWidget {
   final Widget child;
-
   const MainWrapper({super.key, required this.child});
 
   @override
-  State<MainWrapper> createState() => _MainWrapperState();
+  ConsumerState<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends ConsumerState<MainWrapper> {
   bool _collapsed = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (walkthroughService != null &&
+          !walkthroughService.isMainWalkthroughComplete()) {
+        walkthroughService.startMainWalkthrough(context);
+      }
+    });
+  }
+
   int _currentIndexFromPath(String? path) {
-    switch (path) {
-      case '/':
-      case '/games':
-        return 0;
-      case '/matches':
-        return 1;
-      case '/tournaments':
-        return 2;
-      case '/topics':
-        return 3;
-      case '/wallet':
-        return 4;
-      case '/profile':
-        return 5;
-      case '/admin':
-        return 6;
-      default:
-        return 0;
-    }
+    if (path == null) return 0;
+    if (path.startsWith('/matches')) return 1;
+    if (path.startsWith('/tournaments')) return 2;
+    if (path.startsWith('/notifications')) return 3;
+    if (path.startsWith('/topics')) return 4;
+    if (path.startsWith('/wallet')) return 5;
+    if (path.startsWith('/profile')) return 6;
+    if (path.startsWith('/admin')) return 7;
+    return 0; // Default to Games
   }
 
   void _goTo(int index) {
@@ -50,15 +55,18 @@ class _MainWrapperState extends State<MainWrapper> {
         context.go('/tournaments');
         break;
       case 3:
-        context.go('/topics');
+        context.go('/notifications');
         break;
       case 4:
-        context.go('/wallet');
+        context.go('/topics');
         break;
       case 5:
-        context.go('/profile');
+        context.go('/wallet');
         break;
       case 6:
+        context.go('/profile');
+        break;
+      case 7:
         context.go('/admin');
         break;
     }
@@ -66,14 +74,15 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 900;
+    final responsive = Responsive(context);
     final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
-    final useSidebar = (kIsWeb || isDesktop) && isWide;
+    final useSidebar =
+        (kIsWeb || isDesktop) && responsive.widthPercent(1) >= 900;
 
     if (useSidebar) {
-      final currentPath = GoRouterState.of(context).fullPath ?? '/';
+      final currentPath = GoRouterState.of(context).uri.toString();
       final currentIndex = _currentIndexFromPath(currentPath);
       return Scaffold(
         body: SafeArea(
@@ -89,14 +98,14 @@ class _MainWrapperState extends State<MainWrapper> {
                 child: Container(
                   decoration: BoxDecoration(
                     border: Border(
-                      left: BorderSide(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.15),
-                        width: 0.5,
-                      ),
-                    ),
+                        left: BorderSide(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outline
+                          // ignore: deprecated_member_use
+                          .withOpacity(0.15),
+                      width: 0.5,
+                    )),
                   ),
                   child: widget.child,
                 ),
@@ -106,8 +115,6 @@ class _MainWrapperState extends State<MainWrapper> {
         ),
       );
     }
-
-    // Use bottom nav for mobile and tablet
     return Scaffold(
       body: SafeArea(child: widget.child),
       bottomNavigationBar: const VerzusBottomNavBar(),
@@ -115,9 +122,7 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 }
 
-// ======================= SIDEBAR =======================
-
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends ConsumerWidget {
   final bool collapsed;
   final int currentIndex;
   final VoidCallback onToggle;
@@ -131,9 +136,13 @@ class _Sidebar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final width = collapsed ? 76.0 : 240.0;
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
+    final width = collapsed
+        ? responsive.widthPercent(0.06)
+        : responsive.widthPercent(0.18);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -141,22 +150,21 @@ class _Sidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
-          right: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.15),
-            width: 0.5,
-          ),
-        ),
+            right: BorderSide(
+                // ignore: deprecated_member_use
+                color: colorScheme.outline.withOpacity(0.15),
+                width: 0.5)),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
             child: Row(
               children: [
                 if (collapsed)
-                  const BrandMarkLogo(size: 24)
+                  BrandMarkLogo(size: responsive.diagonalPercent(0.03))
                 else
-                  const BrandTextLogo(height: 22),
+                  BrandTextLogo(height: responsive.diagonalPercent(0.025)),
                 const Spacer(),
                 IconButton(
                   onPressed: onToggle,
@@ -165,90 +173,103 @@ class _Sidebar extends StatelessWidget {
                         ? Icons.keyboard_double_arrow_right_rounded
                         : Icons.keyboard_double_arrow_left_rounded,
                     color: colorScheme.onSurfaceVariant,
+                    size: responsive.diagonalPercent(0.025),
                   ),
                   tooltip: collapsed ? 'Expand' : 'Collapse',
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.heightPercent(0.01)),
           _SidebarItem(
-            icon: Icons.gamepad_rounded,
-            label: 'Games',
-            selected: currentIndex == 0,
-            collapsed: collapsed,
-            onTap: () => onItemTap(0),
+              icon: Icons.gamepad_rounded,
+              label: 'Games',
+              selected: currentIndex == 0,
+              collapsed: collapsed,
+              onTap: () => onItemTap(0)),
+          _SidebarItem(
+              icon: Icons.sports_esports_rounded,
+              label: 'Matches',
+              selected: currentIndex == 1,
+              collapsed: collapsed,
+              onTap: () => onItemTap(1)),
+          _SidebarItem(
+              icon: Icons.emoji_events_rounded,
+              label: 'Tournaments',
+              selected: currentIndex == 2,
+              collapsed: collapsed,
+              onTap: () => onItemTap(2)),
+          Showcase(
+            key: walkthroughService!.notificationsTabKey,
+            description: 'Check your notifications here!',
+            child: _SidebarItem(
+                icon: Icons.notifications_rounded,
+                label: 'Notifications',
+                selected: currentIndex == 3,
+                collapsed: collapsed,
+                onTap: () => onItemTap(3)),
           ),
           _SidebarItem(
-            icon: Icons.sports_esports_rounded,
-            label: 'Matches',
-            selected: currentIndex == 1,
-            collapsed: collapsed,
-            onTap: () => onItemTap(1),
-          ),
+              icon: Icons.poll_rounded,
+              label: 'Topics',
+              selected: currentIndex == 4,
+              collapsed: collapsed,
+              onTap: () => onItemTap(4)),
           _SidebarItem(
-            icon: Icons.emoji_events_rounded,
-            label: 'Tournaments',
-            selected: currentIndex == 2,
-            collapsed: collapsed,
-            onTap: () => onItemTap(2),
-          ),
+              icon: Icons.account_balance_wallet_rounded,
+              label: 'Wallet',
+              selected: currentIndex == 5,
+              collapsed: collapsed,
+              onTap: () => onItemTap(5)),
           _SidebarItem(
-            icon: Icons.poll_rounded,
-            label: 'Topics',
-            selected: currentIndex == 3,
-            collapsed: collapsed,
-            onTap: () => onItemTap(3),
-          ),
+              icon: Icons.person_rounded,
+              label: 'Profile',
+              selected: currentIndex == 6,
+              collapsed: collapsed,
+              onTap: () => onItemTap(6)),
           _SidebarItem(
-            icon: Icons.account_balance_wallet_rounded,
-            label: 'Wallet',
-            selected: currentIndex == 4,
-            collapsed: collapsed,
-            onTap: () => onItemTap(4),
-          ),
-          _SidebarItem(
-            icon: Icons.person_rounded,
-            label: 'Profile',
-            selected: currentIndex == 5,
-            collapsed: collapsed,
-            onTap: () => onItemTap(5),
-          ),
-          _SidebarItem(
-            icon: Icons.admin_panel_settings_rounded,
-            label: 'Admin',
-            selected: currentIndex == 6,
-            collapsed: collapsed,
-            onTap: () => onItemTap(6),
-          ),
+              icon: Icons.admin_panel_settings_rounded,
+              label: 'Admin',
+              selected: currentIndex == 7,
+              collapsed: collapsed,
+              onTap: () => onItemTap(7)),
           const Spacer(),
+          if (!collapsed)
+            Padding(
+              padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
+              child: const RecordingIndicator(),
+            ),
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
               decoration: BoxDecoration(
-                color: VerzusColors.primaryPurple.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: VerzusColors.primaryPurple.withValues(alpha: 0.18),
-                ),
+                // ignore: deprecated_member_use
+                color: colorScheme.primary.withOpacity(0.08),
+                borderRadius:
+                    BorderRadius.circular(responsive.diagonalPercent(0.015)),
+                border:
+                    // ignore: deprecated_member_use
+                    Border.all(color: colorScheme.primary.withOpacity(0.18)),
               ),
               child: Row(
+                mainAxisAlignment: collapsed
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.start,
                 children: [
                   Icon(Icons.verified_rounded,
-                      color: VerzusColors.primaryPurple, size: 18),
+                      color: colorScheme.primary,
+                      size: responsive.diagonalPercent(0.02)),
                   if (!collapsed) ...[
-                    const SizedBox(width: 8),
+                    SizedBox(width: responsive.widthPercent(0.01)),
                     Expanded(
                       child: Text(
                         'Secure & Live',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
-                              color: VerzusColors.primaryPurple,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: colorScheme.primary,
                               fontWeight: FontWeight.w700,
+                              fontSize: responsive.diagonalPercent(0.014),
                             ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -263,8 +284,6 @@ class _Sidebar extends StatelessWidget {
     );
   }
 }
-
-// ======================= SIDEBAR ITEM =======================
 
 class _SidebarItem extends StatelessWidget {
   final IconData icon;
@@ -283,45 +302,53 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: EdgeInsets.symmetric(
+            horizontal: responsive.widthPercent(0.01),
+            vertical: responsive.heightPercent(0.005)),
         padding: EdgeInsets.symmetric(
-          horizontal: collapsed ? 12 : 16,
-          vertical: 12,
+          horizontal: collapsed
+              ? responsive.widthPercent(0.015)
+              : responsive.widthPercent(0.02),
+          vertical: responsive.heightPercent(0.015),
         ),
         decoration: BoxDecoration(
           color: selected
-              ? VerzusColors.primaryPurple.withValues(alpha: 0.08)
+              // ignore: deprecated_member_use
+              ? colorScheme.primary.withOpacity(0.08)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius:
+              BorderRadius.circular(responsive.diagonalPercent(0.012)),
           border: selected
-              ? Border.all(
-                  color: VerzusColors.primaryPurple.withValues(alpha: 0.2))
+              // ignore: deprecated_member_use
+              ? Border.all(color: colorScheme.primary.withOpacity(0.2))
               : null,
         ),
         child: Row(
+          mainAxisAlignment:
+              collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: selected
-                  ? VerzusColors.primaryPurple
-                  : colorScheme.onSurfaceVariant,
-            ),
+            Icon(icon,
+                size: responsive.diagonalPercent(0.028),
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant),
             if (!collapsed) ...[
-              const SizedBox(width: 12),
+              SizedBox(width: responsive.widthPercent(0.015)),
               Expanded(
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: selected
-                            ? VerzusColors.primaryPurple
+                            ? colorScheme.primary
                             : colorScheme.onSurfaceVariant,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600,
+                        fontSize: responsive.diagonalPercent(0.018),
                       ),
                 ),
               ),
@@ -333,63 +360,74 @@ class _SidebarItem extends StatelessWidget {
   }
 }
 
-// ======================= RESPONSIVE BOTTOM NAV =======================
-
-class VerzusBottomNavBar extends StatelessWidget {
+class VerzusBottomNavBar extends ConsumerWidget {
   const VerzusBottomNavBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final currentLocation = GoRouterState.of(context).fullPath ?? '/';
-    final width = MediaQuery.of(context).size.width;
-
-    final isSmall = width < 600;
-    final isMedium = width >= 600 && width < 900;
-    final isLarge = width >= 900;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final responsive = Responsive(context);
+    final currentLocation = GoRouterState.of(context).uri.toString();
 
     final items = [
       {'icon': Icons.gamepad_rounded, 'label': 'Games', 'path': '/'},
-      {'icon': Icons.sports_esports_rounded, 'label': 'Matches', 'path': '/matches'},
-      {'icon': Icons.emoji_events_rounded, 'label': 'Tournaments', 'path': '/tournaments'},
-      {'icon': Icons.poll_rounded, 'label': 'Topics', 'path': '/topics'},
-      {'icon': Icons.account_balance_wallet_rounded, 'label': 'Wallet', 'path': '/wallet'},
+      {
+        'icon': Icons.sports_esports_rounded,
+        'label': 'Matches',
+        'path': '/matches'
+      },
+      {
+        'icon': Icons.emoji_events_rounded,
+        'label': 'Tournaments',
+        'path': '/tournaments'
+      },
+      {
+        'icon': Icons.notifications_rounded,
+        'label': 'Alerts',
+        'path': '/notifications'
+      },
+      {
+        'icon': Icons.account_balance_wallet_rounded,
+        'label': 'Wallet',
+        'path': '/wallet'
+      },
     ];
 
-    final barColor = Theme.of(context).colorScheme.surface;
-    final borderColor =
-        Theme.of(context).colorScheme.outline.withValues(alpha: 0.15);
+    final theme = Theme.of(context);
+    final barColor = theme.colorScheme.surface;
+    // ignore: deprecated_member_use
+    final borderColor = theme.colorScheme.outline.withOpacity(0.15);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Container(
-      margin: isLarge ? const EdgeInsets.all(16) : EdgeInsets.zero,
       decoration: BoxDecoration(
-        color: isLarge ? barColor.withValues(alpha: 0.9) : barColor,
-        border: isLarge
-            ? Border.all(color: borderColor)
-            : Border(top: BorderSide(color: borderColor, width: 0.6)),
-        borderRadius: isLarge ? BorderRadius.circular(20) : BorderRadius.zero,
-        boxShadow: isLarge
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]
-            : [],
+        color: barColor,
+        border: Border(top: BorderSide(color: borderColor, width: 0.6)),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: isLarge ? 24 : isMedium ? 20 : 12,
-            vertical: isLarge ? 12 : 8,
+            horizontal: responsive.widthPercent(0.02),
+            vertical: responsive.heightPercent(0.01),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: items.map((item) {
               final isActive = currentLocation == item['path'];
-              return _ResponsiveNavBarItem(
+              final child = _ResponsiveNavBarItem(
                 icon: item['icon'] as IconData,
                 label: item['label'] as String,
                 path: item['path'] as String,
                 isActive: isActive,
-                showLabel: !isSmall,
-                isLarge: isLarge,
               );
+              if (item['path'] == '/') {
+                return Showcase(
+                  key: walkthroughService!.gamesTabKey,
+                  description: 'Browse the Game Library here!',
+                  child: child,
+                );
+              }
+              return child;
             }).toList(),
           ),
         ),
@@ -403,23 +441,21 @@ class _ResponsiveNavBarItem extends StatelessWidget {
   final String label;
   final String path;
   final bool isActive;
-  final bool showLabel;
-  final bool isLarge;
 
   const _ResponsiveNavBarItem({
     required this.icon,
     required this.label,
     required this.path,
     required this.isActive,
-    required this.showLabel,
-    required this.isLarge,
   });
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final primary = VerzusColors.primaryPurple;
+    final primary = colorScheme.primary;
     final onSurface = colorScheme.onSurfaceVariant;
+    final showLabel = responsive.widthPercent(1) > 400;
 
     return GestureDetector(
       onTap: () => context.go(path),
@@ -427,31 +463,31 @@ class _ResponsiveNavBarItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: EdgeInsets.symmetric(
-          horizontal: isLarge ? 16 : 8,
-          vertical: isLarge ? 8 : 4,
+          horizontal: responsive.widthPercent(0.03),
+          vertical: responsive.heightPercent(0.01),
         ),
         decoration: BoxDecoration(
-          color: isActive
-              ? primary.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          // ignore: deprecated_member_use
+          color: isActive ? primary.withOpacity(0.08) : Colors.transparent,
+          borderRadius:
+              BorderRadius.circular(responsive.diagonalPercent(0.015)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: isLarge ? 28 : 22,
+              size: responsive.diagonalPercent(0.03),
               color: isActive ? primary : onSurface,
             ),
             if (showLabel) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: responsive.heightPercent(0.005)),
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: isActive ? primary : onSurface,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                      fontSize: isLarge ? 13 : 11,
+                      fontSize: responsive.diagonalPercent(0.014),
                     ),
               ),
             ],

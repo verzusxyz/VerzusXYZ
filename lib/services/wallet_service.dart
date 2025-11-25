@@ -515,4 +515,74 @@ class WalletNotifier extends Notifier<WalletModel?> {
       rethrow;
     }
   }
+
+  Future<void> processPayouts(
+    List<String> participantIds,
+    Map<String, double> winners, // Map<userId, prizeShare>
+    double entryFee,
+    double commissionRate, {
+    WalletKind kind = WalletKind.live,
+  }) async {
+    final double totalPrizePool = participantIds.length * entryFee;
+    final double commission = totalPrizePool * commissionRate;
+    final double netPrizePool = totalPrizePool - commission;
+
+    await _walletService._firestore.runTransaction((transaction) async {
+      // 1. Consume entry fees from all participants' pending balances
+      for (final userId in participantIds) {
+        final ref = _walletService._firestore
+            .collection(FirestoreSchema.wallets)
+            .doc(userId);
+        final snap = await transaction.get(ref);
+        if (!snap.exists) {
+          throw Exception('Wallet for participant $userId not found.');
+        }
+
+        final data = snap.data() as Map<String, dynamic>;
+        if (kind == WalletKind.live) {
+          final currentPending =
+              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+          if (currentPending < entryFee) {
+            throw Exception('Insufficient locked funds for $userId');
+          }
+          transaction.update(ref, {
+            WalletDocument.pendingBalance: currentPending - entryFee,
+            WalletDocument.totalLost: FieldValue.increment(entryFee),
+          });
+        } else {
+          final currentPending =
+              (data['demo_pending_balance'] ?? 0.0).toDouble();
+          if (currentPending < entryFee) {
+            throw Exception('Insufficient locked demo funds for $userId');
+          }
+          transaction
+              .update(ref, {'demo_pending_balance': currentPending - entryFee});
+        }
+      }
+
+      // 2. Distribute winnings to the winners' available balances
+      for (final winnerEntry in winners.entries) {
+        final winnerId = winnerEntry.key;
+        final prizeShare = winnerEntry.value;
+        final payout = netPrizePool * prizeShare;
+
+        final ref = _walletService._firestore
+            .collection(FirestoreSchema.wallets)
+            .doc(winnerId);
+
+        if (kind == WalletKind.live) {
+          transaction.update(ref, {
+            WalletDocument.balance: FieldValue.increment(payout),
+            WalletDocument.totalWon: FieldValue.increment(payout),
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.update(ref, {
+            'demo_balance': FieldValue.increment(payout),
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    });
+  }
 }

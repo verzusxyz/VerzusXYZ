@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/core/services/firebase_service.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
-import 'package:verzus/theme.dart';
+import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/brand_logo.dart';
 import 'package:verzus/widgets/verzus_text_field.dart';
@@ -30,32 +30,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _showForgotPasswordDialog() async {
+  Future<void> _showForgotPasswordDialog(Responsive responsive) async {
     final controller =
         TextEditingController(text: _emailController.text.trim());
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset Password'),
-        content: TextField(
+        content: VerzusTextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-          ),
+          label: 'Email',
           keyboardType: TextInputType.emailAddress,
         ),
         actions: [
-          TextButton(
+          VerzusButton.text(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          VerzusButton(
             onPressed: () async {
               final email = controller.text.trim();
               if (email.isEmpty) return;
               try {
-                // Note: Password reset is not in the repository,
-                // as it's a direct auth action.
                 await FirebaseAuth.instance
                     .sendPasswordResetEmail(email: email);
                 if (mounted) {
@@ -75,7 +71,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(FirebaseService.mapAuthError(e)),
-                      backgroundColor: VerzusColors.dangerRed,
+                      // ignore: use_build_context_synchronously
+                      backgroundColor: Theme.of(context).colorScheme.error,
                     ),
                   );
                 }
@@ -108,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(FirebaseService.mapAuthError(e)),
-            backgroundColor: VerzusColors.dangerRed,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -121,43 +118,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final maxWidth = constraints.maxWidth;
-            final cardWidth = maxWidth > 600 ? 500.0 : double.infinity;
+            final isWide = constraints.maxWidth > 600;
             return Center(
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: cardWidth),
+                constraints:
+                    BoxConstraints(maxWidth: isWide ? 500.0 : double.infinity),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: responsive.widthPercent(0.05)),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 40),
+                        SizedBox(height: responsive.heightPercent(0.05)),
 
                         // Logo and Title
-                        const Center(
-                            child: SizedBox(
-                                height: 40,
-                                child: FittedBox(
-                                    child: BrandTextLogo(height: 28)))),
-                        const SizedBox(height: 8),
+                        SizedBox(
+                            height: responsive.diagonalPercent(0.05),
+                            child: const FittedBox(
+                                child: BrandTextLogo(height: 28))),
+                        SizedBox(height: responsive.heightPercent(0.01)),
                         Text(
                           'Welcome back to the arena',
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
+                                    fontSize: responsive.diagonalPercent(0.018),
                                   ),
                           textAlign: TextAlign.center,
                         ),
 
-                        const SizedBox(height: 40),
+                        SizedBox(height: responsive.heightPercent(0.05)),
 
                         // Email Field
                         VerzusTextField(
@@ -177,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           },
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: responsive.heightPercent(0.025)),
 
                         // Password Field
                         VerzusTextField(
@@ -193,10 +192,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   : Icons.visibility_off,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                            onPressed: () {
-                              setState(
-                                  () => _obscurePassword = !_obscurePassword);
-                            },
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -206,23 +203,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           },
                         ),
 
-                        const SizedBox(height: 12),
+                        SizedBox(height: responsive.heightPercent(0.015)),
 
                         // Forgot Password
                         Align(
                           alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed:
-                                _isLoading ? null : _showForgotPasswordDialog,
-                            child: Text(
-                              'Forgot Password?',
-                              style:
-                                  TextStyle(color: VerzusColors.primaryPurple),
-                            ),
+                          child: VerzusButton.text(
+                            onPressed: _isLoading
+                                ? null
+                                : () => _showForgotPasswordDialog(responsive),
+                            child: const Text('Forgot Password?'),
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        SizedBox(height: responsive.heightPercent(0.03)),
 
                         // Login Button
                         VerzusButton(
@@ -231,13 +225,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: const Text('Sign In'),
                         ),
 
-                        const SizedBox(height: 16),
+                        SizedBox(height: responsive.heightPercent(0.02)),
 
-                        // Sign Up Link (wrap to avoid overflow on tiny screens)
+                        // Sign Up Link
                         Wrap(
                           alignment: WrapAlignment.center,
                           crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 4,
+                          spacing: responsive.widthPercent(0.01),
                           children: [
                             Text(
                               "Don't have an account?",
@@ -246,6 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   .bodyMedium
                                   ?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
+                                    fontSize: responsive.diagonalPercent(0.017),
                                   ),
                             ),
                             GestureDetector(
@@ -258,51 +253,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     .textTheme
                                     .bodyMedium
                                     ?.copyWith(
-                                      color: VerzusColors.primaryPurple,
+                                      color: colorScheme.primary,
                                       fontWeight: FontWeight.w600,
+                                      fontSize:
+                                          responsive.diagonalPercent(0.017),
                                     ),
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 24),
+                        SizedBox(height: responsive.heightPercent(0.03)),
 
                         // Demo Mode Notice
                         Container(
-                          padding: const EdgeInsets.all(16),
+                          padding:
+                              EdgeInsets.all(responsive.diagonalPercent(0.02)),
                           decoration: BoxDecoration(
-                            color:
-                                VerzusColors.accentGreen.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondary
+                                // ignore: deprecated_member_use
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                responsive.diagonalPercent(0.015)),
                             border: Border.all(
-                              color: VerzusColors.accentGreen
-                                  .withValues(alpha: 0.3),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .secondary
+                                  // ignore: deprecated_member_use
+                                  .withOpacity(0.3),
                             ),
                           ),
                           child: Column(
                             children: [
                               Icon(
                                 Icons.info_rounded,
-                                color: VerzusColors.accentGreen,
-                                size: 20,
+                                color: Theme.of(context).colorScheme.secondary,
+                                size: responsive.diagonalPercent(0.025),
                               ),
-                              const SizedBox(height: 8),
+                              SizedBox(height: responsive.heightPercent(0.01)),
                               Text(
                                 'Demo mode available - practice without real money!',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
                                     ?.copyWith(
-                                      color: VerzusColors.accentGreen,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
                                       fontWeight: FontWeight.w500,
+                                      fontSize:
+                                          responsive.diagonalPercent(0.016),
                                     ),
                                 textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: responsive.heightPercent(0.02)),
                       ],
                     ),
                   ),

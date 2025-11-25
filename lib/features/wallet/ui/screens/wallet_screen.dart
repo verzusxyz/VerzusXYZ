@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/features/wallet/data/repositories/wallet_repository.dart';
-import 'package:verzus/theme.dart';
+import 'package:verzus/services/walkthrough_service.dart';
+import 'package:verzus/utils/responsive.dart';
+import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 
 // A simple provider to manage the wallet mode (Live/Demo)
@@ -34,6 +37,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     final authUser = ref.watch(authRepositoryProvider).currentUser;
     if (authUser == null) {
       return const Center(child: Text('Please sign in to view your wallet.'));
@@ -42,13 +46,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
     final walletStream =
         ref.watch(walletRepositoryProvider).listenToWallet(authUser.uid);
     final mode = ref.watch(walletModeProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wallet'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: EdgeInsets.only(right: responsive.widthPercent(0.02)),
             child: _ModeToggle(
               mode: mode,
               onChanged: (v) => ref.read(walletModeProvider.notifier).state = v,
@@ -62,16 +67,18 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
             stream: walletStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return Padding(
+                  padding: EdgeInsets.all(responsive.widthPercent(0.04)),
+                  child: VerzusShimmers.card(
+                      height: responsive.heightPercent(0.25)),
+                );
               }
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              }
-              final walletData = snapshot.data;
-              final total = _calculateBalance(walletData, mode, 'total');
+              if (snapshot.hasError) return Text('Error: ${snapshot.error}');
+
+              final total = _calculateBalance(snapshot.data, mode, 'total');
               final available =
-                  _calculateBalance(walletData, mode, 'available');
-              final pending = _calculateBalance(walletData, mode, 'pending');
+                  _calculateBalance(snapshot.data, mode, 'available');
+              final pending = _calculateBalance(snapshot.data, mode, 'pending');
 
               return _WalletCard(
                 mode: mode,
@@ -84,25 +91,27 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
             },
           ),
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
+            margin:
+                EdgeInsets.symmetric(horizontal: responsive.widthPercent(0.04)),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius:
+                  BorderRadius.circular(responsive.diagonalPercent(0.015)),
             ),
             child: TabBar(
               controller: _tabController,
               tabs: const [
                 Tab(text: 'Transactions'),
                 Tab(text: 'Deposits'),
-                Tab(text: 'Withdrawals'),
+                Tab(text: 'Withdrawals')
               ],
-              labelColor: VerzusColors.primaryPurple,
-              unselectedLabelColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
+              labelColor: theme.colorScheme.primary,
+              unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
               indicator: BoxDecoration(
                 // ignore: deprecated_member_use
-                color: VerzusColors.primaryPurple.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius:
+                    BorderRadius.circular(responsive.diagonalPercent(0.012)),
               ),
               dividerColor: Colors.transparent,
             ),
@@ -111,10 +120,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTransactionsList(authUser.uid),
-                _buildEmptyState(
+                _buildTransactionsList(authUser.uid, responsive),
+                _buildEmptyState(responsive,
                     icon: Icons.add, title: 'No Deposits', subtitle: ''),
-                _buildEmptyState(
+                _buildEmptyState(responsive,
                     icon: Icons.remove, title: 'No Withdrawals', subtitle: ''),
               ],
             ),
@@ -127,57 +136,72 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   double _calculateBalance(
       Map<String, dynamic>? data, WalletKind mode, String type) {
     if (data == null) return 0.0;
-    final balance = (mode == WalletKind.live
-            ? data['live_balance']
-            : data['demo_balance']) ??
-        0.0;
-    final pending = (mode == WalletKind.live
-            ? data['live_pending']
-            : data['demo_pending']) ??
-        0.0;
+    final balanceKey =
+        mode == WalletKind.live ? 'live_balance' : 'demo_balance';
+    final pendingKey =
+        mode == WalletKind.live ? 'live_pending' : 'demo_pending';
+    final balance = (data[balanceKey] ?? 0.0) as num;
+    final pending = (data[pendingKey] ?? 0.0) as num;
     switch (type) {
       case 'total':
-        return balance + pending;
+        return balance.toDouble() + pending.toDouble();
       case 'available':
-        return balance;
+        return balance.toDouble();
       case 'pending':
-        return pending;
+        return pending.toDouble();
       default:
         return 0.0;
     }
   }
 
-  Widget _buildTransactionsList(String uid) {
+  Widget _buildTransactionsList(String uid, Responsive responsive) {
     final transactionsStream =
         ref.watch(walletRepositoryProvider).getUserTransactions(uid);
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: transactionsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return ListView.builder(
+            padding: EdgeInsets.all(responsive.widthPercent(0.04)),
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+              child: VerzusShimmers.listTile(),
+            ),
+          );
         }
         if (snapshot.hasError) {
           return _buildErrorNotice(context, snapshot.error!);
         }
         final transactions = snapshot.data ?? [];
         if (transactions.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.receipt_long,
-            title: 'No Transactions',
-            subtitle: 'Your transaction history will appear here.',
-          );
+          return _buildEmptyState(responsive,
+              icon: Icons.receipt_long,
+              title: 'No Transactions',
+              subtitle: 'Your transaction history will appear here.');
         }
         return ListView.builder(
+          padding: EdgeInsets.all(responsive.widthPercent(0.04)),
           itemCount: transactions.length,
           itemBuilder: (context, index) {
             final tx = transactions[index];
-            return ListTile(
-              title: Text(tx['description']),
-              subtitle: Text(tx['type']),
-              trailing: Text(
-                '\$${(tx['amount'] as num).toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: tx['type'] == 'deposit' ? Colors.green : Colors.red,
+            final isDeposit = tx['type'] == 'deposit';
+            return Card(
+              margin: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+              child: ListTile(
+                title: Text(tx['description'],
+                    style:
+                        TextStyle(fontSize: responsive.diagonalPercent(0.018))),
+                subtitle: Text(tx['type'],
+                    style:
+                        TextStyle(fontSize: responsive.diagonalPercent(0.015))),
+                trailing: Text(
+                  '${isDeposit ? '+' : '-'}\$${(tx['amount'] as num).toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: isDeposit ? Colors.green : Colors.red,
+                    fontSize: responsive.diagonalPercent(0.018),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             );
@@ -188,63 +212,65 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   }
 
   void _showDepositDialog() {
-    // Simplified deposit dialog
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Deposit'),
-        content: const Text('Deposit functionality will be implemented here.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Deposit'),
+              content:
+                  const Text('Deposit functionality will be implemented here.'),
+              actions: [
+                VerzusButton.text(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'))
+              ],
+            ));
   }
 
   void _showWithdrawDialog() {
-    // Simplified withdraw dialog
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Withdraw'),
-        content: const Text('Withdraw functionality will be implemented here.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Withdraw'),
+              content: const Text(
+                  'Withdraw functionality will be implemented here.'),
+              actions: [
+                VerzusButton.text(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'))
+              ],
+            ));
   }
 
   Widget _buildErrorNotice(BuildContext context, Object error) {
     return Center(child: Text('Error: $error'));
   }
 
-  Widget _buildEmptyState(
+  Widget _buildEmptyState(Responsive responsive,
       {required IconData icon,
       required String title,
       required String subtitle}) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 48, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+          Icon(icon,
+              size: responsive.diagonalPercent(0.06), color: Colors.grey),
+          SizedBox(height: responsive.heightPercent(0.02)),
+          Text(title,
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontSize: responsive.diagonalPercent(0.025))),
+          SizedBox(height: responsive.heightPercent(0.01)),
+          Text(subtitle,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontSize: responsive.diagonalPercent(0.018))),
         ],
       ),
     );
   }
 }
 
-class _WalletCard extends StatelessWidget {
+class _WalletCard extends ConsumerWidget {
   final WalletKind mode;
   final double total;
   final double available;
@@ -262,60 +288,69 @@ class _WalletCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [VerzusColors.primaryPurple, VerzusColors.primaryPurpleLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final responsive = Responsive(context);
+    final theme = Theme.of(context);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
+
+    return Showcase(
+      key: walkthroughService!.walletBalanceKey,
+      description:
+          'Your wallet balance is displayed here. You can switch between Live and Demo modes.',
+      child: Container(
+        margin: EdgeInsets.all(responsive.widthPercent(0.04)),
+        padding: EdgeInsets.all(responsive.diagonalPercent(0.025)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primary,
+              // ignore: deprecated_member_use
+              theme.colorScheme.primary.withOpacity(0.7)
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius:
+              BorderRadius.circular(responsive.diagonalPercent(0.025)),
         ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-          Text(
-            '\$${total.toStringAsFixed(2)}',
-            style: const TextStyle(
-                color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _BalanceChip(
-                  label: 'Available',
-                  amount: '\$${available.toStringAsFixed(2)}'),
-              _BalanceChip(
-                  label: 'Pending', amount: '\$${pending.toStringAsFixed(2)}'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: VerzusButton(
-                  onPressed: onDeposit,
-                  child: const Text('Deposit'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: VerzusButton.outline(
-                  onPressed: onWithdraw,
-                  child: const Text('Withdraw'),
-                ),
-              ),
-            ],
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: responsive.diagonalPercent(0.018))),
+            Text('\$${total.toStringAsFixed(2)}',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: responsive.diagonalPercent(0.045),
+                    fontWeight: FontWeight.bold)),
+            SizedBox(height: responsive.heightPercent(0.025)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _BalanceChip(
+                    label: 'Available',
+                    amount: '\$${available.toStringAsFixed(2)}'),
+                _BalanceChip(
+                    label: 'Pending',
+                    amount: '\$${pending.toStringAsFixed(2)}'),
+              ],
+            ),
+            SizedBox(height: responsive.heightPercent(0.025)),
+            Row(
+              children: [
+                Expanded(
+                    child: VerzusButton(
+                        onPressed: onDeposit, child: const Text('Deposit'))),
+                SizedBox(width: responsive.widthPercent(0.04)),
+                Expanded(
+                    child: VerzusButton.outline(
+                        onPressed: onWithdraw, child: const Text('Withdraw'))),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -324,20 +359,22 @@ class _WalletCard extends StatelessWidget {
 class _BalanceChip extends StatelessWidget {
   final String label;
   final String amount;
-
   const _BalanceChip({required this.label, required this.amount});
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            style: TextStyle(
+                color: Colors.white70,
+                fontSize: responsive.diagonalPercent(0.016))),
         Text(amount,
-            style: const TextStyle(
+            style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: responsive.diagonalPercent(0.022),
                 fontWeight: FontWeight.w600)),
       ],
     );
@@ -351,20 +388,22 @@ class _ModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: EdgeInsets.all(responsive.diagonalPercent(0.005)),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _pill(context,
+          _pill(context, responsive,
               label: 'Live',
               selected: mode == WalletKind.live,
               onTap: () => onChanged(WalletKind.live)),
-          _pill(context,
+          _pill(context, responsive,
               label: 'Demo',
               selected: mode == WalletKind.demo,
               onTap: () => onChanged(WalletKind.demo)),
@@ -373,30 +412,33 @@ class _ModeToggle extends StatelessWidget {
     );
   }
 
-  Widget _pill(BuildContext context,
+  Widget _pill(BuildContext context, Responsive responsive,
       {required String label,
       required bool selected,
       required VoidCallback onTap}) {
+    final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: responsive.widthPercent(0.03),
+            vertical: responsive.heightPercent(0.008)),
         decoration: BoxDecoration(
           color: selected
               // ignore: deprecated_member_use
-              ? VerzusColors.primaryPurple.withOpacity(0.15)
+              ? theme.colorScheme.primary.withOpacity(0.15)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: selected
-                    ? VerzusColors.primaryPurple
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              ),
+          style: theme.textTheme.labelMedium?.copyWith(
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              fontSize: responsive.diagonalPercent(0.016)),
         ),
       ),
     );

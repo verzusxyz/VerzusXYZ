@@ -2,12 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
+import 'package:verzus/services/screen_record_service.dart';
 
 class GameLauncherService {
-  const GameLauncherService();
+  final ScreenRecordService screenRecordService;
+  const GameLauncherService(this.screenRecordService);
 
   Future<void> launchGame(BuildContext context, GameModel game) async {
     try {
+      await screenRecordService.startRecording();
       switch (game.platform) {
         case 'web':
           final url = game.webUrl;
@@ -17,6 +20,7 @@ class GameLauncherService {
             // ignore: use_build_context_synchronously
             if (!ok) _toast(context, 'Could not open ${game.title}');
           } else {
+            // ignore: use_build_context_synchronously
             _toast(context, 'No URL available for this game');
           }
           break;
@@ -33,11 +37,13 @@ class GameLauncherService {
               _toast(context, 'Could not open Play Store for ${game.title}');
             }
           } else {
+            // ignore: use_build_context_synchronously
             _toast(context, 'Android package id missing');
           }
           break;
         case 'ios':
           // Opening by bundleId requires App Store numeric id; show guidance.
+          // ignore: use_build_context_synchronously
           _toast(context,
               'On iOS, launch the game from your home screen. ReplayKit will handle capture.');
           break;
