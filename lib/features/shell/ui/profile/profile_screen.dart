@@ -1,11 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:verzus/services/auth_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/core/providers/theme_provider.dart';
 import 'package:verzus/widgets/app_loading.dart';
+
+final notificationsEnabledProvider =
+    StateNotifierProvider<NotificationSettingsNotifier, bool>((ref) {
+  return NotificationSettingsNotifier();
+});
+
+class NotificationSettingsNotifier extends StateNotifier<bool> {
+  NotificationSettingsNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('notifications_enabled') ?? true;
+  }
+
+  Future<void> toggle(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', value);
+    state = value;
+  }
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -409,9 +433,9 @@ class ProfileScreen extends ConsumerWidget {
               leading: const Icon(Icons.notifications_rounded),
               title: const Text('Notifications'),
               trailing: Switch(
-                value: true,
+                value: ref.watch(notificationsEnabledProvider),
                 onChanged: (value) {
-                  // TODO: Implement notification toggle
+                  ref.read(notificationsEnabledProvider.notifier).toggle(value);
                 },
                 activeColor: VerzusColors.primaryPurple,
               ),
@@ -479,7 +503,7 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () {
-                      // TODO: Copy to clipboard
+                      Clipboard.setData(ClipboardData(text: referralCode));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Referral code copied!'),

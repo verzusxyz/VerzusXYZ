@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
-import 'package:verzus/firestore/firestore_data_schema.dart';
+import 'package.dart';
 
 final walletServiceProvider = Provider<WalletService>((ref) {
   return WalletService();
@@ -69,19 +69,6 @@ class WalletService {
       // ignore: avoid_print
       print('Error loading wallet: $e');
       rethrow;
-    }
-  }
-
-  Future<void> updateBalance(String userId, double newBalance) async {
-    try {
-      await _firestore.collection(FirestoreSchema.wallets).doc(userId).update({
-        WalletDocument.balance: newBalance,
-        WalletDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error updating balance: $e');
-      throw Exception('Failed to update balance');
     }
   }
 
@@ -173,8 +160,7 @@ class WalletService {
     }
   }
 
-  /// Consume locked funds without returning to balance (used for entry fees and lost wagers)
-  Future<void> consumeLocked(String userId, double amount,
+  Future<void> debit(String userId, double amount,
       {WalletKind kind = WalletKind.live}) async {
     try {
       await _firestore.runTransaction((txn) async {
@@ -214,9 +200,11 @@ class WalletService {
     }
   }
 
-  /// Credit balance (e.g., prize payout)
-  Future<void> creditBalance(String userId, double amount,
-      {WalletKind kind = WalletKind.live}) async {
+  Future<void> credit(
+      {required String userId,
+      required double amount,
+      WalletKind kind = WalletKind.live,
+      String? memo}) async {
     try {
       await _firestore.collection(FirestoreSchema.wallets).doc(userId).update({
         (kind == WalletKind.live ? WalletDocument.balance : 'demo_balance'):
@@ -227,22 +215,6 @@ class WalletService {
       // ignore: avoid_print
       print('Error crediting balance: $e');
       rethrow;
-    }
-  }
-
-  Future<void> addAffiliatePending(String userId, double amount,
-      {WalletKind kind = WalletKind.live}) async {
-    try {
-      await _firestore.collection(FirestoreSchema.wallets).doc(userId).update({
-        kind == WalletKind.live
-            ? WalletDocument.pendingBalance
-            : 'demo_pending_balance': FieldValue.increment(amount),
-        WalletDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error adding affiliate pending: $e');
-      throw Exception('Failed to add affiliate funds');
     }
   }
 
@@ -365,22 +337,6 @@ class WalletNotifier extends Notifier<WalletModel?> {
     }
   }
 
-  Future<void> updateBalance(double newBalance) async {
-    if (state == null) return;
-
-    try {
-      await _walletService.updateBalance(state!.userId, newBalance);
-      state = state!.copyWith(
-        balance: newBalance,
-        updatedAt: DateTime.now(),
-      );
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error updating balance: $e');
-      rethrow;
-    }
-  }
-
   Future<void> lockFunds(double amount,
       {WalletKind kind = WalletKind.live}) async {
     if (state == null) return;
@@ -429,31 +385,6 @@ class WalletNotifier extends Notifier<WalletModel?> {
     } catch (e) {
       // ignore: avoid_print
       print('Error unlocking funds: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> addAffiliatePending(double amount,
-      {WalletKind kind = WalletKind.live}) async {
-    if (state == null) return;
-
-    try {
-      await _walletService.addAffiliatePending(state!.userId, amount,
-          kind: kind);
-      if (kind == WalletKind.live) {
-        state = state!.copyWith(
-          pendingBalance: state!.pendingBalance + amount,
-          updatedAt: DateTime.now(),
-        );
-      } else {
-        state = state!.copyWith(
-          demoPendingBalance: state!.demoPendingBalance + amount,
-          updatedAt: DateTime.now(),
-        );
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error adding affiliate funds: $e');
       rethrow;
     }
   }
@@ -514,75 +445,5 @@ class WalletNotifier extends Notifier<WalletModel?> {
       print('Error resetting wallet: $e');
       rethrow;
     }
-  }
-
-  Future<void> processPayouts(
-    List<String> participantIds,
-    Map<String, double> winners, // Map<userId, prizeShare>
-    double entryFee,
-    double commissionRate, {
-    WalletKind kind = WalletKind.live,
-  }) async {
-    final double totalPrizePool = participantIds.length * entryFee;
-    final double commission = totalPrizePool * commissionRate;
-    final double netPrizePool = totalPrizePool - commission;
-
-    await _walletService._firestore.runTransaction((transaction) async {
-      // 1. Consume entry fees from all participants' pending balances
-      for (final userId in participantIds) {
-        final ref = _walletService._firestore
-            .collection(FirestoreSchema.wallets)
-            .doc(userId);
-        final snap = await transaction.get(ref);
-        if (!snap.exists) {
-          throw Exception('Wallet for participant $userId not found.');
-        }
-
-        final data = snap.data() as Map<String, dynamic>;
-        if (kind == WalletKind.live) {
-          final currentPending =
-              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
-          if (currentPending < entryFee) {
-            throw Exception('Insufficient locked funds for $userId');
-          }
-          transaction.update(ref, {
-            WalletDocument.pendingBalance: currentPending - entryFee,
-            WalletDocument.totalLost: FieldValue.increment(entryFee),
-          });
-        } else {
-          final currentPending =
-              (data['demo_pending_balance'] ?? 0.0).toDouble();
-          if (currentPending < entryFee) {
-            throw Exception('Insufficient locked demo funds for $userId');
-          }
-          transaction
-              .update(ref, {'demo_pending_balance': currentPending - entryFee});
-        }
-      }
-
-      // 2. Distribute winnings to the winners' available balances
-      for (final winnerEntry in winners.entries) {
-        final winnerId = winnerEntry.key;
-        final prizeShare = winnerEntry.value;
-        final payout = netPrizePool * prizeShare;
-
-        final ref = _walletService._firestore
-            .collection(FirestoreSchema.wallets)
-            .doc(winnerId);
-
-        if (kind == WalletKind.live) {
-          transaction.update(ref, {
-            WalletDocument.balance: FieldValue.increment(payout),
-            WalletDocument.totalWon: FieldValue.increment(payout),
-            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
-          });
-        } else {
-          transaction.update(ref, {
-            'demo_balance': FieldValue.increment(payout),
-            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-      }
-    });
   }
 }

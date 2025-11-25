@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
@@ -50,7 +51,19 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Matches')),
+      appBar: AppBar(
+        title: const Text('Matches'),
+        actions: [
+          Showcase(
+            key: walkthroughService!.leaderboardKey,
+            description: 'Check the leaderboards to see your ranking!',
+            child: IconButton(
+              icon: const Icon(Icons.leaderboard),
+              onPressed: () => context.go('/leaderboards'),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Container(
@@ -67,7 +80,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
                 const Tab(text: 'Join Match'),
                 Tab(
                   child: Showcase(
-                    key: walkthroughService!.createMatchKey,
+                    key: walkthroughService.createMatchKey,
                     description: 'Tap here to create your own match!',
                     child: const Text('Create Match'),
                   ),
