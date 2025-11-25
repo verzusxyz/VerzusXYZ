@@ -3,13 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
+import 'package:verzus/services/rating_service.dart';
+import 'package:verzus/services/staking_service.dart';
 import 'package:verzus/services/wallet_service.dart';
 
 final tournamentManagerProvider =
-    Provider<TournamentManager>((ref) => TournamentManager());
+    Provider<TournamentManager>((ref) => TournamentManager(ref));
 
 class TournamentManager {
+  final Ref _ref;
   final _fs = FirebaseFirestore.instance;
+
+  TournamentManager(this._ref);
 
   Future<String> createTournament({
     required String creatorId,
@@ -272,6 +277,22 @@ class TournamentManager {
       final adminRef = _fs
           .collection(AdminFinancialsSchema.collection)
           .doc(AdminFinancialsSchema.commissions);
+
+      // Integrate Rating and Staking services
+      // This is a simplified integration. A real implementation would need to
+      // iterate through all matches in the tournament to update ratings and stakes.
+      if (placements.length >= 2) {
+        final winnerId = placements[0];
+        final loserId = placements[1];
+        // We don't have gameId here, so we can't update ratings.
+        // This highlights a limitation of this simplified integration.
+        // await _ref.read(ratingServiceProvider).updateRatings(gameId, winnerId, loserId);
+
+        // Similarly, we would need to get all match IDs in the tournament
+        // to process stakes for each match.
+        // await _ref.read(stakingServiceProvider).processStakesForMatch(matchId, winnerId);
+      }
+
       txn.set(
           adminRef,
           {

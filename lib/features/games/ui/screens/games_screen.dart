@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:verzus/features/activity/data/repositories/activity_log_repository.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
-import 'package:verzus/services/game_launcher.dart';
+import 'package:verzus/features/games/providers/game_launcher_provider.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/shimmers.dart';
@@ -125,7 +125,8 @@ class GamesScreen extends ConsumerWidget {
                                         gameId: g.gameId,
                                         platform: g.platform,
                                       );
-                                  await const GameLauncherService()
+                                  await ref
+                                      .read(gameLauncherProvider)
                                       // ignore: use_build_context_synchronously
                                       .launchGame(context, g);
                                 },

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/brand_logo.dart';
+import 'package:verzus/widgets/recording_indicator.dart';
 
 class MainWrapper extends StatefulWidget {
   final Widget child;
@@ -222,6 +223,11 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onItemTap(6),
           ),
           const Spacer(),
+          if (!collapsed)
+            const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: RecordingIndicator(),
+            ),
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Container(

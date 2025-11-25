@@ -97,4 +97,31 @@ class TournamentRepository {
           .toList();
     });
   }
+
+  /// Creates the initial bracket for a tournament.
+  Future<void> createBracket(String tournamentId, List<Map<String, dynamic>> matches) async {
+    final batch = _firestore.batch();
+    final tournamentRef = _firestore.collection(FirestoreSchema.tournaments).doc(tournamentId);
+
+    for (final match in matches) {
+      final matchRef = tournamentRef.collection('matches').doc(match['matchId']);
+      batch.set(matchRef, match);
+    }
+
+    await batch.commit();
+  }
+
+  /// Updates a match with the winner's ID.
+  Future<void> updateMatchWinner(String tournamentId, String matchId, String winnerId) async {
+    final matchRef = _firestore
+        .collection(FirestoreSchema.tournaments)
+        .doc(tournamentId)
+        .collection('matches')
+        .doc(matchId);
+    await matchRef.update({
+      'winnerId': winnerId,
+      'isComplete': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }
