@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/tournaments/data/repositories/tournament_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/app_loading.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -36,6 +39,7 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tournaments'),
@@ -50,7 +54,15 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
                     ref.read(walletModeProvider.notifier).state = v,
               ),
             );
-          })
+          }),
+          Showcase(
+            key: walkthroughService!.leaderboardKey,
+            description: 'Check the leaderboards to see your ranking!',
+            child: IconButton(
+              icon: const Icon(Icons.leaderboard),
+              onPressed: () => context.go('/leaderboards'),
+            ),
+          ),
         ],
       ),
       body: Column(

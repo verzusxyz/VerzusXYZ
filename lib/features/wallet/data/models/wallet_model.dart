@@ -10,6 +10,7 @@ class WalletModel {
   // Live wallet (real money)
   final double balance; // live available
   final double pendingBalance; // live pending
+  final double affiliateBalance;
   final double totalDeposited;
   final double totalWithdrawn;
   final double totalWon;
@@ -27,6 +28,7 @@ class WalletModel {
     required this.userId,
     required this.balance,
     required this.pendingBalance,
+    required this.affiliateBalance,
     required this.totalDeposited,
     required this.totalWithdrawn,
     required this.totalWon,
@@ -44,6 +46,7 @@ class WalletModel {
       userId: data[WalletDocument.userId] ?? doc.id,
       balance: (data[WalletDocument.balance] ?? 0.0).toDouble(),
       pendingBalance: (data[WalletDocument.pendingBalance] ?? 0.0).toDouble(),
+      affiliateBalance: (data['affiliateBalance'] ?? 0.0).toDouble(),
       totalDeposited: (data[WalletDocument.totalDeposited] ?? 0.0).toDouble(),
       totalWithdrawn: (data[WalletDocument.totalWithdrawn] ?? 0.0).toDouble(),
       totalWon: (data[WalletDocument.totalWon] ?? 0.0).toDouble(),
@@ -61,6 +64,7 @@ class WalletModel {
       WalletDocument.userId: userId,
       WalletDocument.balance: balance,
       WalletDocument.pendingBalance: pendingBalance,
+      'affiliateBalance': affiliateBalance,
       WalletDocument.totalDeposited: totalDeposited,
       WalletDocument.totalWithdrawn: totalWithdrawn,
       WalletDocument.totalWon: totalWon,
@@ -84,6 +88,7 @@ class WalletModel {
   WalletModel copyWith({
     double? balance,
     double? pendingBalance,
+    double? affiliateBalance,
     double? totalDeposited,
     double? totalWithdrawn,
     double? totalWon,
@@ -98,6 +103,7 @@ class WalletModel {
       userId: userId,
       balance: balance ?? this.balance,
       pendingBalance: pendingBalance ?? this.pendingBalance,
+      affiliateBalance: affiliateBalance ?? this.affiliateBalance,
       totalDeposited: totalDeposited ?? this.totalDeposited,
       totalWithdrawn: totalWithdrawn ?? this.totalWithdrawn,
       totalWon: totalWon ?? this.totalWon,
@@ -182,6 +188,38 @@ class TransactionModel {
       'metadata': metadata,
       'createdAt': Timestamp.fromDate(createdAt),
     };
+  }
+
+  TransactionModel copyWith({
+    String? id,
+    String? userId,
+    TransactionType? type,
+    double? grossAmount,
+    double? gatewayFee,
+    double? platformCommission,
+    double? affiliatePayout,
+    double? netAmount,
+    String? relatedId,
+    String? currency,
+    TransactionStatus? status,
+    Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+  }) {
+    return TransactionModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      type: type ?? this.type,
+      grossAmount: grossAmount ?? this.grossAmount,
+      gatewayFee: gatewayFee ?? this.gatewayFee,
+      platformCommission: platformCommission ?? this.platformCommission,
+      affiliatePayout: affiliatePayout ?? this.affiliatePayout,
+      netAmount: netAmount ?? this.netAmount,
+      relatedId: relatedId ?? this.relatedId,
+      currency: currency ?? this.currency,
+      status: status ?? this.status,
+      metadata: metadata ?? this.metadata,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 }
 

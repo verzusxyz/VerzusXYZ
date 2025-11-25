@@ -77,6 +77,10 @@ class AuthRepository {
     }
   }
 
+  Future<UserModel?> getUser(String uid) async {
+    return getUserProfile(uid);
+  }
+
   /// Creates a new user profile document in Firestore.
   Future<void> createUserProfile({
     required String uid,

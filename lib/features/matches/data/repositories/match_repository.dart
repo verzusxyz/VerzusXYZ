@@ -28,6 +28,18 @@ class MatchRepository {
     }
   }
 
+  Future<MatchModel?> getMatch(String matchId) async {
+    try {
+      final doc = await _firestore
+          .collection(FirestoreSchema.matches)
+          .doc(matchId)
+          .get();
+      return doc.exists ? MatchModel.fromFirestore(doc) : null;
+    } on FirebaseException {
+      rethrow;
+    }
+  }
+
   /// Joins an existing match in Firestore.
   Future<void> joinMatch(String matchId, String userId) async {
     try {

@@ -15,6 +15,8 @@ import 'package:verzus/features/shell/ui/main_wrapper.dart';
 import 'package:verzus/features/shell/ui/profile/profile_screen.dart';
 import 'package:verzus/features/shell/ui/topics/topics_screen.dart';
 import 'package:verzus/features/tournaments/ui/screens/tournaments_screen.dart';
+import 'package:verzus/features/wallet/ui/screens/affiliate_screen.dart';
+import 'package:verzus/features/wallet/ui/screens/loyalty_screen.dart';
 import 'package:verzus/features/wallet/ui/screens/wallet_screen.dart';
 import 'package:verzus/services/auth_service.dart';
 
@@ -92,6 +94,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/games', builder: (context, state) => const GamesScreen()),
           GoRoute(path: '/games/submit', builder: (context, state) => const SubmitGameScreen()),
           GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
+          GoRoute(path: '/wallet/affiliate', builder: (context, state) => const AffiliateScreen()),
+          GoRoute(path: '/wallet/loyalty', builder: (context, state) => const LoyaltyScreen()),
         ],
       ),
     ],
