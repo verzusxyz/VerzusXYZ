@@ -1,29 +1,44 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/brand_logo.dart';
 import 'package:verzus/widgets/recording_indicator.dart';
 
-class MainWrapper extends StatefulWidget {
+class MainWrapper extends ConsumerStatefulWidget {
   final Widget child;
   const MainWrapper({super.key, required this.child});
 
   @override
-  State<MainWrapper> createState() => _MainWrapperState();
+  ConsumerState<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+class _MainWrapperState extends ConsumerState<MainWrapper> {
   bool _collapsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (walkthroughService != null && !walkthroughService.isMainWalkthroughComplete()) {
+        walkthroughService.startMainWalkthrough(context);
+      }
+    });
+  }
 
   int _currentIndexFromPath(String? path) {
     if (path == null) return 0;
     if (path.startsWith('/matches')) return 1;
     if (path.startsWith('/tournaments')) return 2;
-    if (path.startsWith('/topics')) return 3;
-    if (path.startsWith('/wallet')) return 4;
-    if (path.startsWith('/profile')) return 5;
-    if (path.startsWith('/admin')) return 6;
+    if (path.startsWith('/notifications')) return 3;
+    if (path.startsWith('/topics')) return 4;
+    if (path.startsWith('/wallet')) return 5;
+    if (path.startsWith('/profile')) return 6;
+    if (path.startsWith('/admin')) return 7;
     return 0; // Default to Games
   }
 
@@ -32,10 +47,11 @@ class _MainWrapperState extends State<MainWrapper> {
       case 0: context.go('/'); break;
       case 1: context.go('/matches'); break;
       case 2: context.go('/tournaments'); break;
-      case 3: context.go('/topics'); break;
-      case 4: context.go('/wallet'); break;
-      case 5: context.go('/profile'); break;
-      case 6: context.go('/admin'); break;
+      case 3: context.go('/notifications'); break;
+      case 4: context.go('/topics'); break;
+      case 5: context.go('/wallet'); break;
+      case 6: context.go('/profile'); break;
+      case 7: context.go('/admin'); break;
     }
   }
 
@@ -83,7 +99,7 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends ConsumerWidget {
   final bool collapsed;
   final int currentIndex;
   final VoidCallback onToggle;
@@ -97,9 +113,10 @@ class _Sidebar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
     final width = collapsed ? responsive.widthPercent(0.06) : responsive.widthPercent(0.18);
 
     return AnimatedContainer(
@@ -136,10 +153,15 @@ class _Sidebar extends StatelessWidget {
           _SidebarItem(icon: Icons.gamepad_rounded, label: 'Games', selected: currentIndex == 0, collapsed: collapsed, onTap: () => onItemTap(0)),
           _SidebarItem(icon: Icons.sports_esports_rounded, label: 'Matches', selected: currentIndex == 1, collapsed: collapsed, onTap: () => onItemTap(1)),
           _SidebarItem(icon: Icons.emoji_events_rounded, label: 'Tournaments', selected: currentIndex == 2, collapsed: collapsed, onTap: () => onItemTap(2)),
-          _SidebarItem(icon: Icons.poll_rounded, label: 'Topics', selected: currentIndex == 3, collapsed: collapsed, onTap: () => onItemTap(3)),
-          _SidebarItem(icon: Icons.account_balance_wallet_rounded, label: 'Wallet', selected: currentIndex == 4, collapsed: collapsed, onTap: () => onItemTap(4)),
-          _SidebarItem(icon: Icons.person_rounded, label: 'Profile', selected: currentIndex == 5, collapsed: collapsed, onTap: () => onItemTap(5)),
-          _SidebarItem(icon: Icons.admin_panel_settings_rounded, label: 'Admin', selected: currentIndex == 6, collapsed: collapsed, onTap: () => onItemTap(6)),
+          Showcase(
+            key: walkthroughService?.notificationsTabKey,
+            description: 'Check your notifications here!',
+            child: _SidebarItem(icon: Icons.notifications_rounded, label: 'Notifications', selected: currentIndex == 3, collapsed: collapsed, onTap: () => onItemTap(3)),
+          ),
+          _SidebarItem(icon: Icons.poll_rounded, label: 'Topics', selected: currentIndex == 4, collapsed: collapsed, onTap: () => onItemTap(4)),
+          _SidebarItem(icon: Icons.account_balance_wallet_rounded, label: 'Wallet', selected: currentIndex == 5, collapsed: collapsed, onTap: () => onItemTap(5)),
+          _SidebarItem(icon: Icons.person_rounded, label: 'Profile', selected: currentIndex == 6, collapsed: collapsed, onTap: () => onItemTap(6)),
+          _SidebarItem(icon: Icons.admin_panel_settings_rounded, label: 'Admin', selected: currentIndex == 7, collapsed: collapsed, onTap: () => onItemTap(7)),
           const Spacer(),
           if (!collapsed) Padding(
             padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
@@ -237,11 +259,11 @@ class _SidebarItem extends StatelessWidget {
   }
 }
 
-class VerzusBottomNavBar extends StatelessWidget {
+class VerzusBottomNavBar extends ConsumerWidget {
   const VerzusBottomNavBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final responsive = Responsive(context);
     final currentLocation = GoRouterState.of(context).uri.toString();
 
@@ -249,13 +271,14 @@ class VerzusBottomNavBar extends StatelessWidget {
       {'icon': Icons.gamepad_rounded, 'label': 'Games', 'path': '/'},
       {'icon': Icons.sports_esports_rounded, 'label': 'Matches', 'path': '/matches'},
       {'icon': Icons.emoji_events_rounded, 'label': 'Tournaments', 'path': '/tournaments'},
-      {'icon': Icons.poll_rounded, 'label': 'Topics', 'path': '/topics'},
+      {'icon': Icons.notifications_rounded, 'label': 'Alerts', 'path': '/notifications'},
       {'icon': Icons.account_balance_wallet_rounded, 'label': 'Wallet', 'path': '/wallet'},
     ];
 
     final theme = Theme.of(context);
     final barColor = theme.colorScheme.surface;
     final borderColor = theme.colorScheme.outline.withOpacity(0.15);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -273,12 +296,20 @@ class VerzusBottomNavBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: items.map((item) {
               final isActive = currentLocation == item['path'];
-              return _ResponsiveNavBarItem(
+              final child = _ResponsiveNavBarItem(
                 icon: item['icon'] as IconData,
                 label: item['label'] as String,
                 path: item['path'] as String,
                 isActive: isActive,
               );
+              if (item['path'] == '/') {
+                return Showcase(
+                  key: walkthroughService?.gamesTabKey,
+                  description: 'Browse the Game Library here!',
+                  child: child,
+                );
+              }
+              return child;
             }).toList(),
           ),
         ),

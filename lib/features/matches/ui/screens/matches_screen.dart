@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/matches/data/repositories/match_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -43,6 +45,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> with TickerProvid
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
     final theme = Theme.of(context);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Matches')),
@@ -56,10 +59,16 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> with TickerProvid
             ),
             child: TabBar(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'Join Match'),
-                Tab(text: 'Create Match'),
-                Tab(text: 'Live Matches'),
+              tabs: [
+                const Tab(text: 'Join Match'),
+                Tab(
+                  child: Showcase(
+                    key: walkthroughService?.createMatchKey,
+                    description: 'Tap here to create your own match!',
+                    child: const Text('Create Match'),
+                  ),
+                ),
+                const Tab(text: 'Live Matches'),
               ],
               labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
@@ -130,6 +139,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> with TickerProvid
   Widget _buildCreateMatchForm(Responsive responsive) {
     final gamesStream = ref.watch(gameRepositoryProvider).getGames();
     final theme = Theme.of(context);
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,11 +185,15 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> with TickerProvid
               Row(
                 children: [
                   Expanded(
-                    child: VerzusTextField(
-                      controller: _wagerController,
-                      label: 'Entry Fee (USD)',
-                      prefixText: '\$',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    child: Showcase(
+                      key: walkthroughService?.wagerFieldKey,
+                      description: 'Set your wager amount here.',
+                      child: VerzusTextField(
+                        controller: _wagerController,
+                        label: 'Entry Fee (USD)',
+                        prefixText: '\$',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
                     ),
                   ),
                   SizedBox(width: responsive.widthPercent(0.03)),
@@ -239,7 +253,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> with TickerProvid
         updatedAt: DateTime.now(),
         gameData: {
           'game_id': _selectedGameId,
-          'private': _isPrivate, // Correctly passing the flag
+          'private': _isPrivate,
         },
       );
       await ref.read(matchRepositoryProvider).createMatch(match);

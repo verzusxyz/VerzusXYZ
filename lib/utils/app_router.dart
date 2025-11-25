@@ -1,4 +1,3 @@
-// import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import 'package:verzus/features/auth/ui/screens/signup_screen.dart';
 import 'package:verzus/features/games/ui/screens/games_screen.dart';
 import 'package:verzus/features/games/ui/screens/submit_game_screen.dart';
 import 'package:verzus/features/matches/ui/screens/matches_screen.dart';
+import 'package:verzus/features/notifications/ui/screens/notifications_screen.dart';
 import 'package:verzus/features/shell/ui/admin/admin_dashboard.dart';
 import 'package:verzus/features/shell/ui/landing/landing_page.dart';
 import 'package:verzus/features/shell/ui/legal/privacy_screen.dart';
@@ -82,42 +82,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           return MainWrapper(child: child);
         },
         routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const GamesScreen(),
-          ),
-          GoRoute(
-            path: '/matches',
-            builder: (context, state) => const MatchesScreen(),
-          ),
-          GoRoute(
-            path: '/tournaments',
-            builder: (context, state) => const TournamentsScreen(),
-          ),
-          GoRoute(
-            path: '/topics',
-            builder: (context, state) => const TopicsScreen(),
-          ),
-          GoRoute(
-            path: '/wallet',
-            builder: (context, state) => const WalletScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
-          ),
-          GoRoute(
-            path: '/games',
-            builder: (context, state) => const GamesScreen(),
-          ),
-          GoRoute(
-            path: '/games/submit',
-            builder: (context, state) => const SubmitGameScreen(),
-          ),
-          GoRoute(
-            path: '/admin',
-            builder: (context, state) => const AdminDashboardScreen(),
-          ),
+          GoRoute(path: '/', builder: (context, state) => const GamesScreen()),
+          GoRoute(path: '/matches', builder: (context, state) => const MatchesScreen()),
+          GoRoute(path: '/tournaments', builder: (context, state) => const TournamentsScreen()),
+          GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+          GoRoute(path: '/topics', builder: (context, state) => const TopicsScreen()),
+          GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
+          GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+          GoRoute(path: '/games', builder: (context, state) => const GamesScreen()),
+          GoRoute(path: '/games/submit', builder: (context, state) => const SubmitGameScreen()),
+          GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
         ],
       ),
     ],

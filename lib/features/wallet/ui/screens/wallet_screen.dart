@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/features/wallet/data/repositories/wallet_repository.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -212,7 +214,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   }
 }
 
-class _WalletCard extends StatelessWidget {
+class _WalletCard extends ConsumerWidget {
   final WalletKind mode;
   final double total;
   final double available;
@@ -226,43 +228,49 @@ class _WalletCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final responsive = Responsive(context);
     final theme = Theme.of(context);
-    return Container(
-      margin: EdgeInsets.all(responsive.widthPercent(0.04)),
-      padding: EdgeInsets.all(responsive.diagonalPercent(0.025)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
+
+    return Showcase(
+      key: walkthroughService?.walletBalanceKey,
+      description: 'Your wallet balance is displayed here. You can switch between Live and Demo modes.',
+      child: Container(
+        margin: EdgeInsets.all(responsive.widthPercent(0.04)),
+        padding: EdgeInsets.all(responsive.diagonalPercent(0.025)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(responsive.diagonalPercent(0.025)),
         ),
-        borderRadius: BorderRadius.circular(responsive.diagonalPercent(0.025)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
-              style: TextStyle(color: Colors.white70, fontSize: responsive.diagonalPercent(0.018))),
-          Text('\$${total.toStringAsFixed(2)}', style: TextStyle(
-              color: Colors.white, fontSize: responsive.diagonalPercent(0.045), fontWeight: FontWeight.bold)),
-          SizedBox(height: responsive.heightPercent(0.025)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _BalanceChip(label: 'Available', amount: '\$${available.toStringAsFixed(2)}'),
-              _BalanceChip(label: 'Pending', amount: '\$${pending.toStringAsFixed(2)}'),
-            ],
-          ),
-          SizedBox(height: responsive.heightPercent(0.025)),
-          Row(
-            children: [
-              Expanded(child: VerzusButton(onPressed: onDeposit, child: const Text('Deposit'))),
-              SizedBox(width: responsive.widthPercent(0.04)),
-              Expanded(child: VerzusButton.outline(onPressed: onWithdraw, child: const Text('Withdraw'))),
-            ],
-          ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
+                style: TextStyle(color: Colors.white70, fontSize: responsive.diagonalPercent(0.018))),
+            Text('\$${total.toStringAsFixed(2)}', style: TextStyle(
+                color: Colors.white, fontSize: responsive.diagonalPercent(0.045), fontWeight: FontWeight.bold)),
+            SizedBox(height: responsive.heightPercent(0.025)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _BalanceChip(label: 'Available', amount: '\$${available.toStringAsFixed(2)}'),
+                _BalanceChip(label: 'Pending', amount: '\$${pending.toStringAsFixed(2)}'),
+              ],
+            ),
+            SizedBox(height: responsive.heightPercent(0.025)),
+            Row(
+              children: [
+                Expanded(child: VerzusButton(onPressed: onDeposit, child: const Text('Deposit'))),
+                SizedBox(width: responsive.widthPercent(0.04)),
+                Expanded(child: VerzusButton.outline(onPressed: onWithdraw, child: const Text('Withdraw'))),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
