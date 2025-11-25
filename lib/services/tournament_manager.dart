@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
-import 'package:verzus/services/rating_service.dart';
-import 'package:verzus/services/staking_service.dart';
 import 'package:verzus/services/wallet_service.dart';
 
 final tournamentManagerProvider =
@@ -220,96 +218,49 @@ class TournamentManager {
   Future<void> payoutTournament(
       String tournamentId, List<String> placements) async {
     // placements: ordered list of userIds by final rank (index 0 => 1st)
-    await _fs.runTransaction((txn) async {
-      final tRef =
-          _fs.collection(FirestoreSchema.tournaments).doc(tournamentId);
-      final tSnap = await txn.get(tRef);
-      if (!tSnap.exists) throw Exception('Tournament not found');
-      final t = tSnap.data() as Map<String, dynamic>;
-      final totalEntries =
-          (t[TournamentDocument.entryFeesTotal] ?? 0.0).toDouble();
-      final commissionRate =
-          (t[TournamentDocument.commissionRate] ?? 0.20).toDouble();
-      final payoutRatios = Map<String, num>.from(
-          t[TournamentDocument.payoutRatios] ?? {'1': 100});
-      final isDemo = (t[TournamentDocument.walletKind] ?? 'live') == 'demo';
-      final entry = (t[TournamentDocument.entryFee] ?? 0.0).toDouble();
+    final tRef = _fs.collection(FirestoreSchema.tournaments).doc(tournamentId);
+    final tSnap = await tRef.get();
+    if (!tSnap.exists) throw Exception('Tournament not found');
+    final t = tSnap.data() as Map<String, dynamic>;
 
-      final platformCut = totalEntries * commissionRate;
-      final prizePool = totalEntries - platformCut;
+    final commissionRate = (t[TournamentDocument.commissionRate] ?? 0.20).toDouble();
+    final payoutRatios = Map<String, num>.from(t[TournamentDocument.payoutRatios] ?? {'1': 100});
+    final isDemo = (t[TournamentDocument.walletKind] ?? 'live') == 'demo';
+    final entryFee = (t[TournamentDocument.entryFee] ?? 0.0).toDouble();
 
-      // Consume each participant's entry pending
-      final qs = await _fs
-          .collection(FirestoreSchema.tournamentParticipants)
-          .where(TournamentParticipantDocument.tournamentId,
-              isEqualTo: tournamentId)
-          .get();
-      for (final d in qs.docs) {
-        final uid = d.data()[TournamentParticipantDocument.userId] as String;
-        if (entry > 0) {
-          await WalletService().consumeLocked(uid, entry,
-              kind: isDemo ? WalletKind.demo : WalletKind.live);
-        }
+    // Get all participants
+    final participantsSnapshot = await _fs
+        .collection(FirestoreSchema.tournamentParticipants)
+        .where(TournamentParticipantDocument.tournamentId, isEqualTo: tournamentId)
+        .get();
+    final participantIds = participantsSnapshot.docs
+        .map((doc) => doc.data()[TournamentParticipantDocument.userId] as String)
+        .toList();
+
+    // Determine winners and their shares
+    final Map<String, double> winners = {};
+    for (int i = 0; i < placements.length; i++) {
+      final rank = i + 1;
+      final percent = (payoutRatios['$rank'] ?? 0).toDouble();
+      if (percent > 0) {
+        winners[placements[i]] = percent / 100.0;
       }
+    }
 
-      // Credit winners based on payout ratios
-
-      for (int i = 0; i < placements.length; i++) {
-        final rank = i + 1;
-        final percent = (payoutRatios['$rank'] ?? 0).toDouble();
-        if (percent <= 0) continue;
-        final amount = prizePool * (percent / 100.0);
-
-        final winnerId = placements[i];
-        await WalletService().creditBalance(winnerId, amount,
-            kind: isDemo ? WalletKind.demo : WalletKind.live);
-        await WalletService().addWalletTransaction(
-          userId: winnerId,
-          type: FirestoreConstants.transactionTypeWin,
-          amount: amount,
-          status: FirestoreConstants.transactionStatusCompleted,
-          description: 'Tournament payout for rank #$rank',
-          relatedTournamentId: tournamentId,
+    // Call the centralized payout service
+    await _ref.read(walletServiceProvider).processPayouts(
+          participantIds,
+          winners,
+          entryFee,
+          commissionRate,
+          kind: isDemo ? WalletKind.demo : WalletKind.live,
         );
-      }
 
-      // Record platform commission
-      final adminRef = _fs
-          .collection(AdminFinancialsSchema.collection)
-          .doc(AdminFinancialsSchema.commissions);
-
-      // Integrate Rating and Staking services
-      // This is a simplified integration. A real implementation would need to
-      // iterate through all matches in the tournament to update ratings and stakes.
-      if (placements.length >= 2) {
-        final winnerId = placements[0];
-        final loserId = placements[1];
-        // We don't have gameId here, so we can't update ratings.
-        // This highlights a limitation of this simplified integration.
-        // await _ref.read(ratingServiceProvider).updateRatings(gameId, winnerId, loserId);
-
-        // Similarly, we would need to get all match IDs in the tournament
-        // to process stakes for each match.
-        // await _ref.read(stakingServiceProvider).processStakesForMatch(matchId, winnerId);
-      }
-
-      txn.set(
-          adminRef,
-          {
-            AdminFinancialsSchema.totalCommission:
-                FieldValue.increment(platformCut),
-            AdminFinancialsSchema.updatedAt: FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true));
-
-      // Finalize tournament document
-      txn.update(tRef, {
-        TournamentDocument.status: FirestoreConstants.tournamentStatusCompleted,
-        TournamentDocument.prizePool: prizePool,
-        TournamentDocument.platformFee: platformCut,
-        TournamentDocument.endDate: FieldValue.serverTimestamp(),
-        TournamentDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
+    // Finalize tournament document
+    await tRef.update({
+      TournamentDocument.status: FirestoreConstants.tournamentStatusCompleted,
+      TournamentDocument.endDate: FieldValue.serverTimestamp(),
+      TournamentDocument.updatedAt: FieldValue.serverTimestamp(),
     });
   }
 

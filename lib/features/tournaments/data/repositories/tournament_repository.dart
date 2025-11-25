@@ -124,4 +124,31 @@ class TournamentRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  /// Fetches all matches for a given tournament.
+  Future<List<TournamentMatchModel>> getAllMatches(String tournamentId) async {
+    final snapshot = await _firestore
+        .collection(FirestoreSchema.tournaments)
+        .doc(tournamentId)
+        .collection('matches')
+        .get();
+    return snapshot.docs
+        .map((doc) => TournamentMatchModel.fromMap(doc.data()))
+        .toList();
+  }
+
+  /// Updates a match with the player IDs.
+  Future<void> updateMatchPlayers(
+      String tournamentId, String matchId, String? player1Id, String? player2Id) async {
+    final matchRef = _firestore
+        .collection(FirestoreSchema.tournaments)
+        .doc(tournamentId)
+        .collection('matches')
+        .doc(matchId);
+    await matchRef.update({
+      'player1Id': player1Id,
+      'player2Id': player2Id,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }
