@@ -16,6 +16,8 @@ class FirestoreSchema {
   static const String leaderboardEntries = 'leaderboard_entries';
   static const String gameResults = 'game_results';
   static const String systemSettings = 'system_settings';
+  static const String affiliateEntries = 'affiliate_entries';
+  static const String loyaltyEntries = 'loyalty_entries';
 }
 
 /// User document structure
@@ -41,6 +43,7 @@ class WalletDocument {
   static const String userId = 'user_id';
   static const String balance = 'balance';
   static const String pendingBalance = 'pending_balance';
+  static const String affiliateBalance = 'affiliate_balance';
   static const String totalDeposited = 'total_deposited';
   static const String totalWithdrawn = 'total_withdrawn';
   static const String totalWon = 'total_won';
@@ -211,6 +214,25 @@ class SystemSettingsDocument {
   static const String value = 'value';
   static const String description = 'description';
   static const String updatedAt = 'updated_at';
+}
+
+/// Affiliate entry document structure
+class AffiliateEntryDocument {
+  static const String id = 'id';
+  static const String userId = 'user_id';
+  static const String referredUserId = 'referred_user_id';
+  static const String amount = 'amount';
+  static const String createdAt = 'created_at';
+}
+
+/// Loyalty entry document structure
+class LoyaltyEntryDocument {
+  static const String id = 'id';
+  static const String userId = 'user_id';
+  static const String points = 'points';
+  static const String type = 'type';
+  static const String description = 'description';
+  static const String createdAt = 'created_at';
 }
 
 /// Admin financials ledger

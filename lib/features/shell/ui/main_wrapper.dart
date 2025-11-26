@@ -102,7 +102,6 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
                       color: Theme.of(context)
                           .colorScheme
                           .outline
-                          // ignore: deprecated_member_use
                           .withOpacity(0.15),
                       width: 0.5,
                     )),
@@ -151,7 +150,6 @@ class _Sidebar extends ConsumerWidget {
         color: colorScheme.surface,
         border: Border(
             right: BorderSide(
-                // ignore: deprecated_member_use
                 color: colorScheme.outline.withOpacity(0.15),
                 width: 0.5)),
       ),
@@ -245,12 +243,10 @@ class _Sidebar extends ConsumerWidget {
               width: double.infinity,
               padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
               decoration: BoxDecoration(
-                // ignore: deprecated_member_use
                 color: colorScheme.primary.withOpacity(0.08),
                 borderRadius:
                     BorderRadius.circular(responsive.diagonalPercent(0.015)),
                 border:
-                    // ignore: deprecated_member_use
                     Border.all(color: colorScheme.primary.withOpacity(0.18)),
               ),
               child: Row(
@@ -318,13 +314,11 @@ class _SidebarItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: selected
-              // ignore: deprecated_member_use
               ? colorScheme.primary.withOpacity(0.08)
-              : Colors.transparent,
+              : colorScheme.surface,
           borderRadius:
               BorderRadius.circular(responsive.diagonalPercent(0.012)),
           border: selected
-              // ignore: deprecated_member_use
               ? Border.all(color: colorScheme.primary.withOpacity(0.2))
               : null,
         ),
@@ -394,7 +388,6 @@ class VerzusBottomNavBar extends ConsumerWidget {
 
     final theme = Theme.of(context);
     final barColor = theme.colorScheme.surface;
-    // ignore: deprecated_member_use
     final borderColor = theme.colorScheme.outline.withOpacity(0.15);
     final walkthroughService = ref.watch(walkthroughServiceProvider);
 
@@ -467,8 +460,7 @@ class _ResponsiveNavBarItem extends StatelessWidget {
           vertical: responsive.heightPercent(0.01),
         ),
         decoration: BoxDecoration(
-          // ignore: deprecated_member_use
-          color: isActive ? primary.withOpacity(0.08) : Colors.transparent,
+          color: isActive ? primary.withOpacity(0.08) : colorScheme.surface,
           borderRadius:
               BorderRadius.circular(responsive.diagonalPercent(0.015)),
         ),
