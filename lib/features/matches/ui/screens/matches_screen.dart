@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
@@ -7,11 +8,13 @@ import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/matches/data/repositories/match_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
+import 'package:verzus/features/wallet/providers/wallet_provider.dart';
 import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/verzus_text_field.dart';
+import 'package:verzus/widgets/wallet_toggle.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -28,7 +31,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   String? _selectedGameId;
   GameModel? _selectedGame;
   bool _isPrivate = false;
-  WalletKind _walletKind = WalletKind.live;
 
   @override
   void initState() {
@@ -48,9 +50,28 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     final responsive = Responsive(context);
     final theme = Theme.of(context);
     final walkthroughService = ref.watch(walkthroughServiceProvider);
+    final walletMode = ref.watch(walletModeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Matches')),
+      appBar: AppBar(
+        title: const Text('Matches'),
+        actions: [
+          WalletToggle(
+            groupValue: walletMode,
+            onSelectionChanged: (value) {
+              ref.read(walletModeProvider.notifier).state = value;
+            },
+          ),
+          Showcase(
+            key: walkthroughService!.leaderboardKey,
+            description: 'Check the leaderboards to see who is on top!',
+            child: IconButton(
+              icon: const Icon(Icons.leaderboard),
+              onPressed: () => context.go('/leaderboards'),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Container(
@@ -67,7 +88,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
                 const Tab(text: 'Join Match'),
                 Tab(
                   child: Showcase(
-                    key: walkthroughService!.createMatchKey,
+                    key: walkthroughService.createMatchKey,
                     description: 'Tap here to create your own match!',
                     child: const Text('Create Match'),
                   ),
@@ -102,8 +123,10 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   }
 
   Widget _buildJoinMatches(Responsive responsive) {
-    final matchesStream =
-        ref.watch(matchRepositoryProvider).getAvailableMatches();
+    final walletMode = ref.watch(walletModeProvider);
+    final matchesStream = ref
+        .watch(matchRepositoryProvider)
+        .getAvailableMatches(walletKind: walletMode);
     return StreamBuilder<List<MatchModel>>(
       stream: matchesStream,
       builder: (context, snapshot) {
@@ -156,6 +179,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     final gamesStream = ref.watch(gameRepositoryProvider).getGames();
     final theme = Theme.of(context);
     final walkthroughService = ref.watch(walkthroughServiceProvider);
+    final walletMode = ref.watch(walletModeProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,18 +245,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
                       ),
                     ),
                   ),
-                  SizedBox(width: responsive.widthPercent(0.03)),
-                  DropdownButton<WalletKind>(
-                    value: _walletKind,
-                    items: const [
-                      DropdownMenuItem(
-                          value: WalletKind.live, child: Text('Live')),
-                      DropdownMenuItem(
-                          value: WalletKind.demo, child: Text('Demo')),
-                    ],
-                    onChanged: (v) =>
-                        setState(() => _walletKind = v ?? WalletKind.live),
-                  ),
                 ],
               ),
               SizedBox(height: responsive.heightPercent(0.01)),
@@ -248,7 +260,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
               SizedBox(
                 width: double.infinity,
                 child: VerzusButton(
-                  onPressed: _createMatch,
+                  onPressed: () => _createMatch(walletMode),
                   child: const Text('Create'),
                 ),
               ),
@@ -259,7 +271,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
     );
   }
 
-  Future<void> _createMatch() async {
+  Future<void> _createMatch(WalletKind walletKind) async {
     final authUser = ref.read(authRepositoryProvider).currentUser;
     if (authUser == null) {
       _showError('Please sign in');
@@ -276,7 +288,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
         creatorId: authUser.uid,
         skillTopic: _selectedGame!.title,
         wagerAmount: wager,
-        walletKind: _walletKind,
+        walletKind: walletKind,
         matchFormat: MatchFormat.oneVOne,
         status: MatchStatus.pending,
         createdAt: DateTime.now(),
