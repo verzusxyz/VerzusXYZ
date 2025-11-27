@@ -1,17 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/core/services/firebase_service.dart';
-import 'package:verzus/features/wallet/data/models/affiliate_level_model.dart';
-import 'package:verzus/features/wallet/data/models/platform_fee_model.dart';
+import 'package:verzus/features/admin/data/models/affiliate_level_model.dart';
+import 'package:verzus/features/admin/data/models/platform_fee_model.dart';
 
-final adminServiceProvider = Provider<AdminService>((ref) {
-  return AdminService(ref.read(firebaseServiceProvider));
-});
-
-class AdminService {
+class AdminRepository {
   final FirebaseService _firebaseService;
 
-  AdminService(this._firebaseService);
+  AdminRepository(this._firebaseService);
 
   FirebaseFirestore get _firestore => _firebaseService.firestore;
 

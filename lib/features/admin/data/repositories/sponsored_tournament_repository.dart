@@ -3,15 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/core/services/firebase_service.dart';
 import 'package:verzus/features/tournaments/data/models/sponsored_tournament_model.dart';
 
-final sponsoredTournamentServiceProvider =
-    Provider<SponsoredTournamentService>((ref) {
-  return SponsoredTournamentService(ref.read(firebaseServiceProvider));
-});
-
-class SponsoredTournamentService {
+class SponsoredTournamentRepository {
   final FirebaseService _firebaseService;
 
-  SponsoredTournamentService(this._firebaseService);
+  SponsoredTournamentRepository(this._firebaseService);
 
   FirebaseFirestore get _firestore => _firebaseService.firestore;
 

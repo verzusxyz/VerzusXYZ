@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/core/constants/walkthrough_keys.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/features/wallet/data/repositories/wallet_repository.dart';
@@ -27,6 +28,20 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (await walkthroughService.shouldShowWalkthrough()) {
+        final currentStep = await walkthroughService.getCurrentStep();
+        if (currentStep == 3) {
+          walkthroughService.startWalkthrough(context, [
+            WalkthroughKeys.depositButton,
+            WalkthroughKeys.withdrawButton,
+            WalkthroughKeys.transactionList,
+          ]);
+          await walkthroughService.setCurrentStep(4);
+        }
+      }
+    });
   }
 
   @override
@@ -157,57 +172,63 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   Widget _buildTransactionsList(String uid, Responsive responsive) {
     final transactionsStream =
         ref.watch(walletRepositoryProvider).getUserTransactions(uid);
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: transactionsStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return ListView.builder(
-            padding: EdgeInsets.all(responsive.widthPercent(0.04)),
-            itemCount: 5,
-            itemBuilder: (context, index) => Padding(
-              padding: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
-              child: VerzusShimmers.listTile(),
-            ),
-          );
-        }
-        if (snapshot.hasError) {
-          return _buildErrorNotice(context, snapshot.error!);
-        }
-        final transactions = snapshot.data ?? [];
-        if (transactions.isEmpty) {
-          return _buildEmptyState(responsive,
-              icon: Icons.receipt_long,
-              title: 'No Transactions',
-              subtitle: 'Your transaction history will appear here.');
-        }
-        return ListView.builder(
-          padding: EdgeInsets.all(responsive.widthPercent(0.04)),
-          itemCount: transactions.length,
-          itemBuilder: (context, index) {
-            final tx = transactions[index];
-            final isDeposit = tx['type'] == 'deposit';
-            return Card(
-              margin: EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
-              child: ListTile(
-                title: Text(tx['description'],
-                    style:
-                        TextStyle(fontSize: responsive.diagonalPercent(0.018))),
-                subtitle: Text(tx['type'],
-                    style:
-                        TextStyle(fontSize: responsive.diagonalPercent(0.015))),
-                trailing: Text(
-                  '${isDeposit ? '+' : '-'}\$${(tx['amount'] as num).toStringAsFixed(2)}',
-                  style: TextStyle(
-                    color: isDeposit ? Colors.green : Colors.red,
-                    fontSize: responsive.diagonalPercent(0.018),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+    return Showcase(
+      key: WalkthroughKeys.transactionList,
+      description: 'Your transaction history will appear here.',
+      child: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: transactionsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return ListView.builder(
+              padding: EdgeInsets.all(responsive.widthPercent(0.04)),
+              itemCount: 5,
+              itemBuilder: (context, index) => Padding(
+                padding:
+                    EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+                child: VerzusShimmers.listTile(),
               ),
             );
-          },
-        );
-      },
+          }
+          if (snapshot.hasError) {
+            return _buildErrorNotice(context, snapshot.error!);
+          }
+          final transactions = snapshot.data ?? [];
+          if (transactions.isEmpty) {
+            return _buildEmptyState(responsive,
+                icon: Icons.receipt_long,
+                title: 'No Transactions',
+                subtitle: 'Your transaction history will appear here.');
+          }
+          return ListView.builder(
+            padding: EdgeInsets.all(responsive.widthPercent(0.04)),
+            itemCount: transactions.length,
+            itemBuilder: (context, index) {
+              final tx = transactions[index];
+              final isDeposit = tx['type'] == 'deposit';
+              return Card(
+                margin:
+                    EdgeInsets.only(bottom: responsive.heightPercent(0.015)),
+                child: ListTile(
+                  title: Text(tx['description'],
+                      style: TextStyle(
+                          fontSize: responsive.diagonalPercent(0.018))),
+                  subtitle: Text(tx['type'],
+                      style: TextStyle(
+                          fontSize: responsive.diagonalPercent(0.015))),
+                  trailing: Text(
+                    '${isDeposit ? '+' : '-'}\$${(tx['amount'] as num).toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: isDeposit ? Colors.green : Colors.red,
+                      fontSize: responsive.diagonalPercent(0.018),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -291,66 +312,70 @@ class _WalletCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final responsive = Responsive(context);
     final theme = Theme.of(context);
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
-    return Showcase(
-      key: walkthroughService!.walletBalanceKey,
-      description:
-          'Your wallet balance is displayed here. You can switch between Live and Demo modes.',
-      child: Container(
-        margin: EdgeInsets.all(responsive.widthPercent(0.04)),
-        padding: EdgeInsets.all(responsive.diagonalPercent(0.025)),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primary,
-              // ignore: deprecated_member_use
-              theme.colorScheme.primary.withOpacity(0.7)
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius:
-              BorderRadius.circular(responsive.diagonalPercent(0.025)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
-                style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: responsive.diagonalPercent(0.018))),
-            Text('\$${total.toStringAsFixed(2)}',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: responsive.diagonalPercent(0.045),
-                    fontWeight: FontWeight.bold)),
-            SizedBox(height: responsive.heightPercent(0.025)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _BalanceChip(
-                    label: 'Available',
-                    amount: '\$${available.toStringAsFixed(2)}'),
-                _BalanceChip(
-                    label: 'Pending',
-                    amount: '\$${pending.toStringAsFixed(2)}'),
-              ],
-            ),
-            SizedBox(height: responsive.heightPercent(0.025)),
-            Row(
-              children: [
-                Expanded(
-                    child: VerzusButton(
-                        onPressed: onDeposit, child: const Text('Deposit'))),
-                SizedBox(width: responsive.widthPercent(0.04)),
-                Expanded(
-                    child: VerzusButton.outline(
-                        onPressed: onWithdraw, child: const Text('Withdraw'))),
-              ],
-            ),
+    return Container(
+      margin: EdgeInsets.all(responsive.widthPercent(0.04)),
+      padding: EdgeInsets.all(responsive.diagonalPercent(0.025)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            // ignore: deprecated_member_use
+            theme.colorScheme.primary.withOpacity(0.7)
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius:
+            BorderRadius.circular(responsive.diagonalPercent(0.025)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Total Balance (${mode == WalletKind.live ? 'Live' : 'Demo'})',
+              style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: responsive.diagonalPercent(0.018))),
+          Text('\$${total.toStringAsFixed(2)}',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: responsive.diagonalPercent(0.045),
+                  fontWeight: FontWeight.bold)),
+          SizedBox(height: responsive.heightPercent(0.025)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _BalanceChip(
+                  label: 'Available',
+                  amount: '\$${available.toStringAsFixed(2)}'),
+              _BalanceChip(
+                  label: 'Pending',
+                  amount: '\$${pending.toStringAsFixed(2)}'),
+            ],
+          ),
+          SizedBox(height: responsive.heightPercent(0.025)),
+          Row(
+            children: [
+              Expanded(
+                child: Showcase(
+                  key: WalkthroughKeys.depositButton,
+                  description: 'Add funds to your wallet here.',
+                  child: VerzusButton(
+                      onPressed: onDeposit, child: const Text('Deposit')),
+                ),
+              ),
+              SizedBox(width: responsive.widthPercent(0.04)),
+              Expanded(
+                child: Showcase(
+                  key: WalkthroughKeys.withdrawButton,
+                  description: 'Withdraw your earnings here.',
+                  child: VerzusButton.outline(
+                      onPressed: onWithdraw, child: const Text('Withdraw')),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
