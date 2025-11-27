@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/core/constants/walkthrough_keys.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/tournaments/data/repositories/tournament_repository.dart';
@@ -28,6 +29,19 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (await walkthroughService.shouldShowWalkthrough()) {
+        final currentStep = await walkthroughService.getCurrentStep();
+        if (currentStep == 2) {
+          walkthroughService.startWalkthrough(context, [
+            WalkthroughKeys.autoTournamentsTab,
+            WalkthroughKeys.joinTournamentButton,
+          ]);
+          await walkthroughService.setCurrentStep(3);
+        }
+      }
+    });
   }
 
   @override
@@ -38,7 +52,6 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
     final walletMode = ref.watch(walletModeProvider);
 
     return Scaffold(
@@ -51,13 +64,9 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
               ref.read(walletModeProvider.notifier).state = value;
             },
           ),
-          Showcase(
-            key: walkthroughService!.leaderboardKey,
-            description: 'Check the leaderboards to see who is on top!',
-            child: IconButton(
-              icon: const Icon(Icons.leaderboard),
-              onPressed: () => context.go('/leaderboards'),
-            ),
+          IconButton(
+            icon: const Icon(Icons.leaderboard),
+            onPressed: () => context.go('/leaderboards'),
           ),
         ],
       ),
@@ -71,10 +80,14 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
             ),
             child: TabBar(
               controller: _tabController,
-              tabs: const [
-                Tab(text: 'Join'),
-                Tab(text: 'Create'),
-                Tab(text: 'Live'),
+              tabs: [
+                const Tab(text: 'Join'),
+                const Tab(text: 'Create'),
+                Showcase(
+                  key: WalkthroughKeys.autoTournamentsTab,
+                  description: 'Check out the auto-tournaments here!',
+                  child: const Tab(text: 'Auto'),
+                ),
               ],
               labelColor: VerzusColors.primaryPurple,
               unselectedLabelColor:
@@ -133,6 +146,7 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
             return _TournamentCard(
               tournament: t,
               onJoin: () => _joinTournament(t['id']),
+              isFirst: index == 0,
             );
           },
         );
@@ -262,8 +276,10 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
 class _TournamentCard extends StatelessWidget {
   final Map<String, dynamic> tournament;
   final VoidCallback onJoin;
+  final bool isFirst;
 
-  const _TournamentCard({required this.tournament, required this.onJoin});
+  const _TournamentCard(
+      {required this.tournament, required this.onJoin, this.isFirst = false});
 
   @override
   Widget build(BuildContext context) {
@@ -303,7 +319,14 @@ class _TournamentCard extends StatelessWidget {
               ],
             ),
           ),
-          VerzusButton(onPressed: onJoin, child: const Text('Join')),
+          isFirst
+              ? Showcase(
+                  key: WalkthroughKeys.joinTournamentButton,
+                  description: 'Join a tournament here.',
+                  child:
+                      VerzusButton(onPressed: onJoin, child: const Text('Join')),
+                )
+              : VerzusButton(onPressed: onJoin, child: const Text('Join')),
         ],
       ),
     );

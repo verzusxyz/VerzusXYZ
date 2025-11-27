@@ -3,7 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/core/constants/walkthrough_keys.dart';
+import 'package:verzus/features/profile/providers/profile_providers.dart';
 import 'package:verzus/services/auth_service.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/core/providers/theme_provider.dart';
@@ -31,11 +35,34 @@ class NotificationSettingsNotifier extends StateNotifier<bool> {
   }
 }
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (await walkthroughService.shouldShowWalkthrough()) {
+        final currentStep = await walkthroughService.getCurrentStep();
+        if (currentStep == 4) {
+          walkthroughService.startWalkthrough(context, [
+            WalkthroughKeys.userStats,
+            WalkthroughKeys.editProfileButton,
+          ]);
+          await walkthroughService.setCurrentStep(5);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
@@ -146,17 +173,25 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 32),
 
           // Stats Section
-          _buildStatsSection(context),
+          Showcase(
+            key: WalkthroughKeys.userStats,
+            description: 'Your stats are displayed here.',
+            child: _buildStatsSection(context),
+          ),
 
           const SizedBox(height: 32),
 
           // Menu Items
-          _buildMenuItem(
-            context: context,
-            icon: Icons.person_rounded,
-            title: 'Edit Profile',
-            subtitle: 'Update your information',
-            onTap: () => _showEditProfileDialog(context, ref, user),
+          Showcase(
+            key: WalkthroughKeys.editProfileButton,
+            description: 'Edit your profile information here.',
+            child: _buildMenuItem(
+              context: context,
+              icon: Icons.person_rounded,
+              title: 'Edit Profile',
+              subtitle: 'Update your information',
+              onTap: () => _showEditProfileDialog(context, ref, user),
+            ),
           ),
 
           const SizedBox(height: 12),
@@ -217,6 +252,23 @@ class ProfileScreen extends ConsumerWidget {
             title: 'Help & Support',
             subtitle: 'Get help and contact support',
             onTap: () => _showHelpSupportDialog(context),
+          ),
+          const SizedBox(height: 12),
+          _buildMenuItem(
+            context: context,
+            icon: Icons.replay_rounded,
+            title: 'Restart Tutorial',
+            subtitle: 'Restart the in-app tutorial',
+            onTap: () async {
+              final walkthroughService = ref.read(walkthroughServiceProvider);
+              await walkthroughService.restartWalkthrough();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Tutorial will restart on next login.')),
+                );
+              }
+            },
           ),
 
           const SizedBox(height: 12),
@@ -575,7 +627,7 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               try {
-                await ref.read(authServiceProvider).updateUserProfile(
+                await ref.read(profileRepositoryProvider).updateUserProfile(
                       displayName: nameCtrl.text.trim(),
                       username: usernameCtrl.text.trim(),
                     );

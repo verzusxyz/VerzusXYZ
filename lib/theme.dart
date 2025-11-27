@@ -44,6 +44,10 @@ class FontSizes {
   static const double bodySmall = 12.0;
 }
 
+class Breakpoints {
+  static const double mobile = 768;
+}
+
 ThemeData get lightTheme => ThemeData(
   useMaterial3: true,
   colorScheme: ColorScheme.light(
