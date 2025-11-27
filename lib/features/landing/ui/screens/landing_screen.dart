@@ -4,17 +4,18 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/widgets/brand_logo.dart';
+import 'package:verzus/features/landing/ui/screens/onboarding_screen.dart';
 // ignore: unused_import
 import 'package:verzus/theme.dart'; // your provided theme file
 
-class LandingPage extends StatefulWidget {
-  const LandingPage({super.key});
+class LandingScreen extends StatefulWidget {
+  const LandingScreen({super.key});
 
   @override
-  State<LandingPage> createState() => _LandingPageState();
+  State<LandingScreen> createState() => _LandingPageState();
 }
 
-class _LandingPageState extends State<LandingPage> {
+class _LandingPageState extends State<LandingScreen> {
   final PageController _pageController = PageController();
 
   // Keep keys so nav can reference sections if needed later
@@ -57,6 +58,11 @@ class _LandingPageState extends State<LandingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive check
+    if (!kIsWeb || MediaQuery.of(context).size.width < 768) {
+      return const OnboardingScreen();
+    }
+
     final theme = Theme.of(context);
     final width = MediaQuery.of(context).size.width;
 

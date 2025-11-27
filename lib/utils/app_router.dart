@@ -7,13 +7,13 @@ import 'package:verzus/features/games/ui/screens/games_screen.dart';
 import 'package:verzus/features/games/ui/screens/submit_game_screen.dart';
 import 'package:verzus/features/matches/ui/screens/matches_screen.dart';
 import 'package:verzus/features/notifications/ui/screens/notifications_screen.dart';
-import 'package:verzus/features/shell/ui/admin/admin_dashboard.dart';
-import 'package:verzus/features/shell/ui/landing/landing_page.dart';
-import 'package:verzus/features/shell/ui/legal/privacy_screen.dart';
-import 'package:verzus/features/shell/ui/legal/terms_screen.dart';
+import 'package:verzus/features/admin/ui/screens/admin_dashboard_screen.dart';
+import 'package:verzus/features/landing/ui/screens/landing_screen.dart';
+import 'package:verzus/features/legal/ui/screens/privacy_screen.dart';
+import 'package:verzus/features/legal/ui/screens/terms_screen.dart';
 import 'package:verzus/features/shell/ui/main_wrapper.dart';
-import 'package:verzus/features/shell/ui/profile/profile_screen.dart';
-import 'package:verzus/features/shell/ui/topics/topics_screen.dart';
+import 'package:verzus/features/profile/ui/screens/profile_screen.dart';
+import 'package:verzus/features/topics/ui/screens/topics_screen.dart';
 import 'package:verzus/features/tournaments/ui/screens/tournaments_screen.dart';
 import 'package:verzus/features/wallet/ui/screens/affiliate_screen.dart';
 import 'package:verzus/features/wallet/ui/screens/loyalty_screen.dart';
@@ -57,7 +57,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Public landing (web)
       GoRoute(
         path: '/landing',
-        builder: (context, state) => const LandingPage(),
+        builder: (context, state) => const LandingScreen(),
       ),
       // Standalone legal pages (no nav shell)
       GoRoute(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/core/constants/walkthrough_keys.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
@@ -36,6 +37,20 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final walkthroughService = ref.read(walkthroughServiceProvider);
+      if (await walkthroughService.shouldShowWalkthrough()) {
+        final currentStep = await walkthroughService.getCurrentStep();
+        if (currentStep == 1) {
+          walkthroughService.startWalkthrough(context, [
+            WalkthroughKeys.createMatchTab,
+            WalkthroughKeys.joinMatchTab,
+            WalkthroughKeys.wagerField,
+          ]);
+          await walkthroughService.setCurrentStep(2);
+        }
+      }
+    });
   }
 
   @override
@@ -49,7 +64,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   Widget build(BuildContext context) {
     final responsive = Responsive(context);
     final theme = Theme.of(context);
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
     final walletMode = ref.watch(walletModeProvider);
 
     return Scaffold(
@@ -62,13 +76,9 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
               ref.read(walletModeProvider.notifier).state = value;
             },
           ),
-          Showcase(
-            key: walkthroughService!.leaderboardKey,
-            description: 'Check the leaderboards to see who is on top!',
-            child: IconButton(
-              icon: const Icon(Icons.leaderboard),
-              onPressed: () => context.go('/leaderboards'),
-            ),
+          IconButton(
+            icon: const Icon(Icons.leaderboard),
+            onPressed: () => context.go('/leaderboards'),
           ),
         ],
       ),
@@ -85,13 +95,15 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
             child: TabBar(
               controller: _tabController,
               tabs: [
-                const Tab(text: 'Join Match'),
-                Tab(
-                  child: Showcase(
-                    key: walkthroughService.createMatchKey,
-                    description: 'Tap here to create your own match!',
-                    child: const Text('Create Match'),
-                  ),
+                Showcase(
+                  key: WalkthroughKeys.joinMatchTab,
+                  description: 'Tap here to join an existing match!',
+                  child: const Tab(text: 'Join Match'),
+                ),
+                Showcase(
+                  key: WalkthroughKeys.createMatchTab,
+                  description: 'Tap here to create your own match!',
+                  child: const Tab(text: 'Create Match'),
                 ),
                 const Tab(text: 'Live Matches'),
               ],
@@ -178,7 +190,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
   Widget _buildCreateMatchForm(Responsive responsive) {
     final gamesStream = ref.watch(gameRepositoryProvider).getGames();
     final theme = Theme.of(context);
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
     final walletMode = ref.watch(walletModeProvider);
 
     return Column(
@@ -234,14 +245,14 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen>
                 children: [
                   Expanded(
                     child: Showcase(
-                      key: walkthroughService!.wagerFieldKey,
+                      key: WalkthroughKeys.wagerField,
                       description: 'Set your wager amount here.',
                       child: VerzusTextField(
                         controller: _wagerController,
                         label: 'Entry Fee (USD)',
                         prefixIcon: Text('\$'),
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
                   ),

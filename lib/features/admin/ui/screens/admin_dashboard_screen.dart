@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:verzus/features/admin/providers/admin_providers.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
-import 'package:verzus/services/admin_service.dart';
 import 'package:verzus/services/auth_service.dart';
 import 'package:verzus/services/games_service.dart';
-import 'package:verzus/services/sponsored_tournament_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/shimmers.dart';
@@ -98,7 +97,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
 
       try {
         await ref
-            .read(sponsoredTournamentServiceProvider)
+            .read(sponsoredTournamentRepositoryProvider)
             .createSponsoredTournament(
               name: name,
               prizePool: prizePool,
@@ -129,7 +128,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
           double.tryParse(_affiliateCommissionController.text) ?? 0.0;
 
       try {
-        await ref.read(adminServiceProvider).addAffiliateLevel(
+        await ref.read(adminRepositoryProvider).addAffiliateLevel(
               name: name,
               commissionRate: commissionRate,
             );
@@ -157,7 +156,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
       final topics = double.tryParse(_topicsFeeController.text) ?? 0.0;
 
       try {
-        await ref.read(adminServiceProvider).savePlatformFees(
+        await ref.read(adminRepositoryProvider).savePlatformFees(
               matches: matches,
               tournaments: tournaments,
               autoTournaments: autoTournaments,
