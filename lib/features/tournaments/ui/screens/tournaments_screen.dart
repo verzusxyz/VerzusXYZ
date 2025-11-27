@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/games/data/repositories/game_repository.dart';
 import 'package:verzus/features/tournaments/data/repositories/tournament_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
+import 'package:verzus/features/wallet/providers/wallet_provider.dart';
+import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/app_loading.dart';
 import 'package:verzus/widgets/verzus_button.dart';
-
-// A simple provider to manage the wallet mode (Live/Demo)
-final walletModeProvider = StateProvider<WalletKind>((ref) => WalletKind.live);
+import 'package:verzus/widgets/wallet_toggle.dart';
 
 class TournamentsScreen extends ConsumerStatefulWidget {
   const TournamentsScreen({super.key});
@@ -36,21 +38,27 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final walkthroughService = ref.watch(walkthroughServiceProvider);
+    final walletMode = ref.watch(walletModeProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tournaments'),
         actions: [
-          Consumer(builder: (context, ref, _) {
-            final mode = ref.watch(walletModeProvider);
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: _ModeToggleChip(
-                mode: mode,
-                onChanged: (v) =>
-                    ref.read(walletModeProvider.notifier).state = v,
-              ),
-            );
-          })
+          WalletToggle(
+            groupValue: walletMode,
+            onSelectionChanged: (value) {
+              ref.read(walletModeProvider.notifier).state = value;
+            },
+          ),
+          Showcase(
+            key: walkthroughService!.leaderboardKey,
+            description: 'Check the leaderboards to see who is on top!',
+            child: IconButton(
+              icon: const Icon(Icons.leaderboard),
+              onPressed: () => context.go('/leaderboards'),
+            ),
+          ),
         ],
       ),
       body: Column(
@@ -95,8 +103,10 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
   }
 
   Widget _buildJoinTournament() {
-    final tournamentsStream =
-        ref.watch(tournamentRepositoryProvider).getTournaments(status: 'open');
+    final walletMode = ref.watch(walletModeProvider);
+    final tournamentsStream = ref
+        .watch(tournamentRepositoryProvider)
+        .getTournaments(status: 'open', walletKind: walletMode);
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: tournamentsStream,
       builder: (context, snapshot) {
@@ -414,65 +424,6 @@ class __CreateTournamentFormState extends ConsumerState<_CreateTournamentForm> {
             child: const Text('Create'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModeToggleChip extends StatelessWidget {
-  final WalletKind mode;
-  final ValueChanged<WalletKind> onChanged;
-  const _ModeToggleChip({required this.mode, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _pill(context,
-              label: 'Live',
-              selected: mode == WalletKind.live,
-              onTap: () => onChanged(WalletKind.live)),
-          _pill(context,
-              label: 'Demo',
-              selected: mode == WalletKind.demo,
-              onTap: () => onChanged(WalletKind.demo)),
-        ],
-      ),
-    );
-  }
-
-  Widget _pill(BuildContext context,
-      {required String label,
-      required bool selected,
-      required VoidCallback onTap}) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              // ignore: deprecated_member_use
-              ? VerzusColors.primaryPurple.withOpacity(0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: selected
-                    ? VerzusColors.primaryPurple
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              ),
-        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/tournaments/data/models/tournament_match_model.dart';
+import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 
 /// Provider for the tournament repository.
@@ -80,6 +81,7 @@ class TournamentRepository {
     String? status,
     String? skillTopic,
     int limit = 20,
+    required WalletKind walletKind,
   }) {
     Query query = _firestore
         .collection(FirestoreSchema.tournaments)

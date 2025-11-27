@@ -17,6 +17,7 @@
         "flutter",
         "flutter_riverpod",
         "flutter_svg",
+        "freezed_annotation",
         "go_router",
         "google_fonts",
         "http",
@@ -82,6 +83,15 @@
         "test_api",
         "vector_math",
         "vm_service"
+      ]
+    },
+    {
+      "name": "freezed_annotation",
+      "version": "3.1.0",
+      "dependencies": [
+        "collection",
+        "json_annotation",
+        "meta"
       ]
     },
     {

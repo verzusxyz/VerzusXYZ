@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:verzus/features/games/data/models/game_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/services/rating_service.dart';
@@ -8,6 +9,7 @@ import 'package:verzus/services/staking_service.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/features/tournaments/data/repositories/tournament_repository.dart';
 import 'package:verzus/features/tournaments/data/models/tournament_match_model.dart';
+import 'dart:math';
 
 final tournamentManagerProvider =
     Provider<TournamentManager>((ref) => TournamentManager(ref));
@@ -215,13 +217,17 @@ class TournamentManager {
       }
     }
 
-    await _ref.read(walletServiceProvider).processPayouts(
-          participantIds,
-          winners,
-          entryFee,
-          commissionRate,
-          kind: isDemo ? WalletKind.demo : WalletKind.live,
-        );
+    await _fs.runTransaction((transaction) async {
+      final walletService = _ref.read(walletServiceProvider);
+      await walletService.processPayouts(
+        transaction,
+        participantIds,
+        winners,
+        entryFee,
+        commissionRate,
+        kind: isDemo ? WalletKind.demo : WalletKind.live,
+      );
+    });
 
     await tRef.update({
       TournamentDocument.status: FirestoreConstants.tournamentStatusCompleted,
@@ -255,15 +261,110 @@ class AutoTournamentService {
 
   AutoTournamentService(this._ref, this._firestore);
 
+  Future<List<GameModel>> _getTopGames() async {
+    final gamesSnapshot =
+        await _firestore.collection(FirestoreSchema.gameResults).get();
+    final gameCounts = <String, int>{};
+    for (final doc in gamesSnapshot.docs) {
+      final gameId = doc.data()['game_id'] as String;
+      gameCounts[gameId] = (gameCounts[gameId] ?? 0) + 1;
+    }
+    final sortedGames = gameCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top5Games = sortedGames.take(5).map((e) => e.key).toList();
+
+    final games = <GameModel>[];
+    for (final gameId in top5Games) {
+      final gameDoc = await _firestore.collection('games').doc(gameId).get();
+      if (gameDoc.exists) {
+        games.add(GameModel.fromFirestore(gameDoc));
+      }
+    }
+    return games;
+  }
+
+  Future<void> _createAutoTournament(GameModel game, double entryFee,
+      DateTime startDate, String titlePrefix) async {
+    final tournament = {
+      'title': '$titlePrefix: ${game.title}',
+      'entryFee': entryFee,
+      'maxParticipants': 12,
+      'gameId': game.gameId,
+      'walletKind': 'live',
+      'status': 'open',
+      'creatorId': 'system',
+      'startDate': Timestamp.fromDate(startDate),
+    };
+    await _firestore.collection(FirestoreSchema.tournaments).add(tournament);
+  }
+
+  DateTime _getStartOfNextDay() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day + 1);
+  }
+
+  DateTime _getStartOfNextWeek() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day + 7);
+  }
+
   Future<void> checkAndCreateAutoTournaments() async {
-    // ... (logic remains the same)
+    final topGames = await _getTopGames();
+    if (topGames.isEmpty) return;
+
+    final dailyTournaments = await _firestore
+        .collection(FirestoreSchema.tournaments)
+        .where('title', isGreaterThanOrEqualTo: 'Daily:')
+        .where('startDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartOfNextDay()))
+        .get();
+
+    if (dailyTournaments.docs.isEmpty) {
+      final randomGame = topGames[Random().nextInt(topGames.length)];
+      final entryFee = [5.0, 10.0, 25.0, 50.0][Random().nextInt(4)];
+      await _createAutoTournament(
+          randomGame, entryFee, _getStartOfNextDay(), 'Daily');
+    }
+
+    final weeklyTournaments = await _firestore
+        .collection(FirestoreSchema.tournaments)
+        .where('title', isGreaterThanOrEqualTo: 'Weekly:')
+        .where('startDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartOfNextWeek()))
+        .get();
+
+    if (weeklyTournaments.docs.isEmpty) {
+      final randomGame = topGames[Random().nextInt(topGames.length)];
+      final entryFee = [5.0, 10.0, 25.0, 50.0][Random().nextInt(4)];
+      await _createAutoTournament(
+          randomGame, entryFee, _getStartOfNextWeek(), 'Weekly');
+    }
   }
 
   Future<void> generate12PlayerDoubleEliminationBracket(
     String tournamentId,
     List<String> playerIds,
   ) async {
-    // ... (logic remains the same)
+    playerIds.shuffle();
+    final batch = _firestore.batch();
+    final matches = <Map<String, dynamic>>[];
+
+    // Winners Bracket - Round 1
+    for (int i = 0; i < 6; i++) {
+      matches.add(_createMatch(tournamentId, 1, i + 1,
+          player1Id: playerIds[i * 2], player2Id: playerIds[i * 2 + 1]));
+    }
+    // Losers Bracket - Round 1
+    for (int i = 0; i < 2; i++) {
+      matches.add(_createMatch(tournamentId, -1, i + 1));
+    }
+
+    for (final match in matches) {
+      final matchRef =
+          _firestore.collection(FirestoreSchema.matches).doc(match['matchId']);
+      batch.set(matchRef, match);
+    }
+    await batch.commit();
   }
 
   // ignore: unused_element
@@ -285,24 +386,31 @@ class AutoTournamentService {
 // can call it; this is a compile-time stub that can be replaced with real logic.
 extension WalletServiceTournamentExt on WalletService {
   Future<void> processPayouts(
+    Transaction transaction,
     List<String> participantIds,
     Map<String, double> winners,
     double entryFee,
     double commissionRate, {
     WalletKind kind = WalletKind.live,
   }) async {
-    // Compute the total entry fees and a simple payout for each winner.
-    // TODO: Replace prints with real wallet crediting logic using WalletService
-    // or Firestore transactions (credit balances, create transaction records, etc.).
-    final total = entryFee * participantIds.length;
+    final totalPrizePool =
+        entryFee * participantIds.length * (1 - commissionRate);
+
     for (final entry in winners.entries) {
       final userId = entry.key;
-      final percent = entry.value;
-      final amount = total * percent * (1 - commissionRate);
-      // Placeholder: log the computed payout; implement the real wallet update here.
-      // ignore: avoid_print
-      print(
-          'Computed payout for $userId: $amount (${percent * 100}% of $total)');
+      final percentage = entry.value;
+      final amount = totalPrizePool * percentage;
+
+      if (amount > 0) {
+        final walletRef = FirebaseFirestore.instance
+            .collection(FirestoreSchema.wallets)
+            .doc(userId);
+        transaction.update(walletRef, {
+          (kind == WalletKind.live ? WalletDocument.balance : 'demo_balance'):
+              FieldValue.increment(amount),
+          WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     }
   }
 }

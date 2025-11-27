@@ -508,6 +508,7 @@ class WalletNotifier extends Notifier<WalletModel?> {
         demoPendingBalance: 0.0,
         loyaltyPoints: 0,
         updatedAt: DateTime.now(),
+        affiliateBalance: 0.0,
       );
     } catch (e) {
       // ignore: avoid_print

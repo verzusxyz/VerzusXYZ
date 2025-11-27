@@ -18,12 +18,12 @@ class RecordingIndicator extends ConsumerWidget {
 
     switch (recordingState) {
       case RecordingState.recording:
-        text = 'RECORDING';
-        color = Colors.red;
+        text = 'GAME LIVE';
+        color = Theme.of(context).colorScheme.primary;
         break;
       case RecordingState.processing:
-        text = 'PROCESSING';
-        color = Colors.orange;
+        text = 'MATCH ON';
+        color = Theme.of(context).colorScheme.secondary;
         break;
       case RecordingState.idle:
         text = '';

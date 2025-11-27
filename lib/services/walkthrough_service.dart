@@ -14,6 +14,7 @@ class WalkthroughService {
   final GlobalKey wagerFieldKey = GlobalKey();
   final GlobalKey walletBalanceKey = GlobalKey();
   final GlobalKey notificationsTabKey = GlobalKey();
+  final GlobalKey leaderboardKey = GlobalKey();
 
   // Define flags to track completion
   static const String mainWalkthroughCompleteFlag = 'mainWalkthroughComplete';
@@ -37,13 +38,15 @@ class WalkthroughService {
         wagerFieldKey,
         walletBalanceKey,
         notificationsTabKey,
+        leaderboardKey,
       ]);
     });
   }
 }
 
 // Provider for SharedPreferences
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+final sharedPreferencesProvider =
+    FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
 

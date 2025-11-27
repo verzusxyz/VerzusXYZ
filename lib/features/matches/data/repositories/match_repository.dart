@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
+import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 
 /// Provider for the match repository.
@@ -23,6 +24,18 @@ class MatchRepository {
       matchData['id'] = matchRef.id;
       await matchRef.set(matchData);
       return matchRef.id;
+    } on FirebaseException {
+      rethrow;
+    }
+  }
+
+  Future<MatchModel?> getMatch(String matchId) async {
+    try {
+      final doc = await _firestore
+          .collection(FirestoreSchema.matches)
+          .doc(matchId)
+          .get();
+      return doc.exists ? MatchModel.fromFirestore(doc) : null;
     } on FirebaseException {
       rethrow;
     }
@@ -108,6 +121,8 @@ class MatchRepository {
   Stream<List<MatchModel>> getAvailableMatches({
     String? skillTopic,
     int limit = 20,
+    // ignore: non_constant_identifier_names
+    required WalletKind WalletKind,
   }) {
     Query query = _firestore
         .collection(FirestoreSchema.matches)

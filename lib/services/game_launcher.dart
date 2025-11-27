@@ -45,7 +45,7 @@ class GameLauncherService {
           // Opening by bundleId requires App Store numeric id; show guidance.
           // ignore: use_build_context_synchronously
           _toast(context,
-              'On iOS, launch the game from your home screen. ReplayKit will handle capture.');
+              'On iOS, launch the game from your home screen and we will handle the capture.');
           break;
         default:
           _toast(context, 'Unsupported platform: ${game.platform}');
