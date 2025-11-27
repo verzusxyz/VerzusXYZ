@@ -5,8 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/widgets/brand_logo.dart';
 import 'package:verzus/features/landing/ui/screens/onboarding_screen.dart';
-// ignore: unused_import
-import 'package:verzus/theme.dart'; // your provided theme file
+import 'package:verzus/theme.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -59,7 +58,7 @@ class _LandingPageState extends State<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     // Responsive check
-    if (!kIsWeb || MediaQuery.of(context).size.width < 768) {
+    if (!kIsWeb || MediaQuery.of(context).size.width < Breakpoints.mobile) {
       return const OnboardingScreen();
     }
 

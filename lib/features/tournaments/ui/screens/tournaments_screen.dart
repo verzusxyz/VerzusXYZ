@@ -146,6 +146,7 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
             return _TournamentCard(
               tournament: t,
               onJoin: () => _joinTournament(t['id']),
+              isFirst: index == 0,
             );
           },
         );
@@ -275,8 +276,10 @@ class _TournamentsScreenState extends ConsumerState<TournamentsScreen>
 class _TournamentCard extends StatelessWidget {
   final Map<String, dynamic> tournament;
   final VoidCallback onJoin;
+  final bool isFirst;
 
-  const _TournamentCard({required this.tournament, required this.onJoin});
+  const _TournamentCard(
+      {required this.tournament, required this.onJoin, this.isFirst = false});
 
   @override
   Widget build(BuildContext context) {
@@ -316,11 +319,14 @@ class _TournamentCard extends StatelessWidget {
               ],
             ),
           ),
-          Showcase(
-            key: WalkthroughKeys.joinTournamentButton,
-            description: 'Join a tournament here.',
-            child: VerzusButton(onPressed: onJoin, child: const Text('Join')),
-          ),
+          isFirst
+              ? Showcase(
+                  key: WalkthroughKeys.joinTournamentButton,
+                  description: 'Join a tournament here.',
+                  child:
+                      VerzusButton(onPressed: onJoin, child: const Text('Join')),
+                )
+              : VerzusButton(onPressed: onJoin, child: const Text('Join')),
         ],
       ),
     );

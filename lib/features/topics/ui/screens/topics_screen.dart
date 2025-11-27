@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:verzus/features/auth/providers/auth_providers.dart';
+import 'package:verzus/features/topics/data/models/topic_model.dart';
+import 'package:verzus/features/topics/providers/topics_providers.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
-import 'package:verzus/services/topics_service.dart';
+import 'package:verzus/features/wallet/providers/wallet_provider.dart';
 import 'package:verzus/services/wallet_service.dart';
-import 'package:verzus/services/auth_service.dart';
-import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/shimmers.dart';
@@ -77,7 +77,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               child: _ModeToggleChip(
                 mode: mode,
                 onChanged: (v) =>
-                    ref.read(walletModeProvider.notifier).setMode(v),
+                    ref.read(walletModeProvider.notifier).state = v,
               ),
             );
           }),
@@ -312,20 +312,22 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 
                           try {
                             final mode = ref.read(walletModeProvider);
-                            await FirebaseFirestore.instance
-                                .collection('polls')
-                                .add({
-                              'question': q,
-                              'type': pollType,
-                              'options': pollType == 'yes_no'
+                            final topic = TopicModel(
+                              question: q,
+                              type: pollType,
+                              options: pollType == 'yes_no'
                                   ? ['Yes', 'No']
                                   : options,
-                              'entry_fee': entry,
-                              'wallet_kind':
+                              entryFee: entry,
+                              walletKind:
                                   mode == WalletKind.demo ? 'demo' : 'live',
-                              'status': 'open',
-                              'created_at': FieldValue.serverTimestamp(),
-                            });
+                              status: 'open',
+                              createdAt: DateTime.now(),
+                              votes: {},
+                            );
+                            await ref
+                                .read(topicsRepositoryProvider)
+                                .addTopic(topic);
                             if (mounted) {
                               // ignore: use_build_context_synchronously
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -366,13 +368,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 600;
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('polls')
-              .where('status', isEqualTo: 'open')
-              .orderBy('created_at', descending: true)
-              .limit(50)
-              .snapshots(),
+        final topicsStream = ref.watch(topicsRepositoryProvider).getTopics();
+        return StreamBuilder<List<TopicModel>>(
+          stream: topicsStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return SingleChildScrollView(
@@ -391,7 +389,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               return _buildErrorNotice(
                   context, snapshot.error ?? 'Unknown error');
             }
-            final docs = snapshot.data?.docs ?? [];
+            final docs = snapshot.data ?? [];
             if (docs.isEmpty) {
               return _buildEmptyState(
                 icon: Icons.how_to_vote_rounded,
@@ -407,7 +405,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                   children: docs
                       .map((d) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _PollCard(pollId: d.id, data: d.data()),
+                            child: _PollCard(topic: d),
                           ))
                       .toList(),
                 ),
@@ -424,7 +422,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
                   final d = docs[index];
-                  return _PollCard(pollId: d.id, data: d.data());
+                  return _PollCard(topic: d);
                 },
               );
             }
@@ -439,7 +437,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   }
 
   Widget _buildOpenTopics() {
-    final topicsAsync = ref.watch(openTopicsProvider);
+    final topicsAsync = ref.watch(topicsRepositoryProvider).getTopics();
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 600;
@@ -513,10 +511,25 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               ),
               const SizedBox(height: 16),
 
-              topicsAsync.when(
-                data: (list) {
-                  // ignore: unnecessary_null_comparison
-                  if (list == null || list.isEmpty) {
+              StreamBuilder<List<TopicModel>>(
+                stream: topicsAsync,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Column(
+                      children: [
+                        for (int i = 0; i < 4; i++) ...[
+                          VerzusShimmers.listTile(),
+                          const SizedBox(height: 12),
+                        ]
+                      ],
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return _buildErrorNotice(
+                        context, snapshot.error ?? 'Unknown error');
+                  }
+                  final list = snapshot.data ?? [];
+                  if (list.isEmpty) {
                     return _buildEmptyState(
                       icon: Icons.poll_rounded,
                       title: 'No Live Topics Right Now',
@@ -526,16 +539,12 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                   }
                   if (isNarrow) {
                     return Column(
-                      children: list.map((t) {
-                        // ignore: unnecessary_type_check
-                        final title = t is Map<dynamic, dynamic>
-                            ? t[SkillTopicDocument.name] as String? ?? 'Topic'
-                            : 'Topic';
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _TopicCard(title: title),
-                        );
-                      }).toList(),
+                      children: list
+                          .map((t) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _TopicCard(title: t.question),
+                              ))
+                          .toList(),
                     );
                   } else {
                     return GridView.builder(
@@ -551,72 +560,16 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                       itemCount: list.length,
                       itemBuilder: (context, index) {
                         final t = list[index];
-                        // ignore: unnecessary_type_check
-                        final title = t is Map<dynamic, dynamic>
-                            ? t[SkillTopicDocument.name] as String? ?? 'Topic'
-                            : 'Topic';
-                        return _TopicCard(title: title);
+                        return _TopicCard(title: t.question);
                       },
                     );
                   }
                 },
-                loading: () => Column(
-                  children: [
-                    for (int i = 0; i < 4; i++) ...[
-                      VerzusShimmers.listTile(),
-                      const SizedBox(height: 12),
-                    ]
-                  ],
-                ),
-                error: (e, _) => _buildErrorNotice(context, e),
               ),
             ],
           ),
         );
       },
-    );
-  }
-
-  // ignore: unused_element
-  Widget _buildMyStakes() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _buildEmptyState(
-        icon: Icons.trending_up_rounded,
-        title: 'No Active Stakes',
-        subtitle: 'Your stakes on topics will appear here once you join in!',
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _buildFeaturesList(List<String> features) {
-    return Column(
-      children: features
-          .map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: VerzusColors.accentGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      feature,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ))
-          .toList(),
     );
   }
 
@@ -733,8 +686,18 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 final desc = descController.text.trim();
                 if (title.isEmpty) return;
                 try {
-                  await ref.read(topicsServiceProvider).createOpenTopic(
-                      title: title, description: desc.isEmpty ? null : desc);
+                  final topic = TopicModel(
+                    question: title,
+                    description: desc.isEmpty ? null : desc,
+                    type: 'open',
+                    options: [],
+                    entryFee: 0,
+                    walletKind: 'live',
+                    status: 'open',
+                    createdAt: DateTime.now(),
+                    votes: {},
+                  );
+                  await ref.read(topicsRepositoryProvider).addTopic(topic);
                   if (mounted) {
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -755,75 +718,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _buildTopicTypeCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: color,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  void _showComingSoonMessage(String feature) {
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature coming soon!'),
-        backgroundColor: VerzusColors.primaryPurple,
       ),
     );
   }
@@ -926,16 +820,12 @@ class _ModeToggleChip extends StatelessWidget {
 }
 
 class _PollCard extends ConsumerWidget {
-  final String pollId;
-  final Map<String, dynamic> data;
-  const _PollCard({required this.pollId, required this.data});
+  final TopicModel topic;
+  const _PollCard({required this.topic});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final question = data['question'] ?? 'Poll';
-    final entry = (data['entry_fee'] ?? 0.0).toDouble();
-    final options = List<String>.from(data['options'] ?? []);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -944,7 +834,7 @@ class _PollCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(question,
+          Text(topic.question,
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
@@ -954,15 +844,15 @@ class _PollCard extends ConsumerWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (int i = 0; i < options.length; i++)
+              for (int i = 0; i < topic.options.length; i++)
                 VerzusButton.outline(
-                  onPressed: () => _vote(context, ref, i, entry),
-                  child: Text(options[i]),
+                  onPressed: () => _vote(context, ref, i, topic.entryFee),
+                  child: Text(topic.options[i]),
                 ),
             ],
           ),
           const SizedBox(height: 8),
-          Text('Entry: \$${entry.toStringAsFixed(2)}',
+          Text('Entry: \$${topic.entryFee.toStringAsFixed(2)}',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -974,7 +864,7 @@ class _PollCard extends ConsumerWidget {
 
   Future<void> _vote(BuildContext context, WidgetRef ref, int optionIndex,
       double entry) async {
-    final auth = ref.read(authStateProvider).value;
+    final auth = ref.read(authProvider).value;
     if (auth == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Please sign in')));
@@ -987,14 +877,9 @@ class _PollCard extends ConsumerWidget {
             .read(walletServiceProvider)
             .lockFunds(auth.uid, entry, kind: mode);
       }
-      await FirebaseFirestore.instance.collection('poll_votes').add({
-        'poll_id': pollId,
-        'user_id': auth.uid,
-        'option_index': optionIndex,
-        'amount_locked': entry,
-        'wallet_kind': mode == WalletKind.demo ? 'demo' : 'live',
-        'created_at': FieldValue.serverTimestamp(),
-      });
+      await ref
+          .read(topicsRepositoryProvider)
+          .voteOnTopic(topic.id!, topic.options[optionIndex]);
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Vote recorded')));
