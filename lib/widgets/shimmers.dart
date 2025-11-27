@@ -7,7 +7,7 @@ class VerzusShimmers {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -45,7 +45,7 @@ class VerzusShimmers {
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(12),
         ),
       ),
@@ -56,7 +56,7 @@ class VerzusShimmers {
     return _ShimmerWrapper(
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withAlpha(8),
           borderRadius: BorderRadius.circular(12),
         ),
         padding: const EdgeInsets.all(16),
@@ -87,8 +87,8 @@ class _ShimmerWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Shimmer.fromColors(
-      baseColor: base.withValues(alpha: 0.6),
-      highlightColor: base.withValues(alpha: 0.3),
+      baseColor: base.withAlpha(60),
+      highlightColor: base.withAlpha(30),
       child: child,
     );
   }
