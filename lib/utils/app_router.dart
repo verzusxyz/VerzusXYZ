@@ -7,7 +7,7 @@ import 'package:verzus/features/games/ui/screens/games_screen.dart';
 import 'package:verzus/features/games/ui/screens/submit_game_screen.dart';
 import 'package:verzus/features/matches/ui/screens/matches_screen.dart';
 import 'package:verzus/features/notifications/ui/screens/notifications_screen.dart';
-import 'package:verzus/features/shell/ui/admin/admin_dashboard.dart';
+import 'package:verzus/features/admin/ui/screens/admin_dashboard_screen.dart';
 import 'package:verzus/features/shell/ui/landing/landing_page.dart';
 import 'package:verzus/features/shell/ui/legal/privacy_screen.dart';
 import 'package:verzus/features/shell/ui/legal/terms_screen.dart';
