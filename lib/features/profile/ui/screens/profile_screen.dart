@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:verzus/services/auth_service.dart';
@@ -58,13 +59,13 @@ class ProfileScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  VerzusColors.primaryPurple.withValues(alpha: 0.1),
-                  VerzusColors.primaryPurpleLight.withValues(alpha: 0.05),
+                  VerzusColors.primaryPurple.withOpacity(0.1),
+                  VerzusColors.primaryPurpleLight.withOpacity(0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: VerzusColors.primaryPurple.withValues(alpha: 0.2),
+                color: VerzusColors.primaryPurple.withOpacity(0.2),
               ),
             ),
             child: Column(
@@ -74,7 +75,7 @@ class ProfileScreen extends ConsumerWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: VerzusColors.primaryPurple.withValues(alpha: 0.2),
+                    color: VerzusColors.primaryPurple.withOpacity(0.2),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: VerzusColors.primaryPurple,
@@ -226,9 +227,9 @@ class ProfileScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -417,6 +418,17 @@ class ProfileScreen extends ConsumerWidget {
                 activeColor: VerzusColors.primaryPurple,
               ),
             ),
+            ListTile(
+              leading: const Icon(Icons.notifications_rounded),
+              title: const Text('Notifications'),
+              trailing: Switch(
+                value: true, // TODO: connect to a provider
+                onChanged: (value) {
+                  // TODO: connect to a provider
+                },
+                activeColor: VerzusColors.primaryPurple,
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -448,10 +460,10 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: VerzusColors.primaryPurple.withValues(alpha: 0.1),
+                color: VerzusColors.primaryPurple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: VerzusColors.primaryPurple.withValues(alpha: 0.3),
+                  color: VerzusColors.primaryPurple.withOpacity(0.3),
                 ),
               ),
               child: Row(
@@ -467,6 +479,7 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () {
+                      Clipboard.setData(ClipboardData(text: referralCode));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Referral code copied!'),

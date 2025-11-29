@@ -1,7 +1,8 @@
+import 'package.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/core/services/firebase_service.dart';
-import 'package:verzus/features/topics/data/models/topic_model.dart';
+import 'package:verzus/features/topics/data/models/poll_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 
 final topicRepositoryProvider = Provider<TopicRepository>((ref) {
@@ -15,17 +16,17 @@ class TopicRepository {
 
   FirebaseFirestore get _firestore => _firebaseService.firestore;
 
-  CollectionReference<TopicModel> get _pollsRef =>
-      _firestore.collection('polls').withConverter<TopicModel>(
+  CollectionReference<PollModel> get _pollsRef =>
+      _firestore.collection(FirestoreSchema.polls).withConverter<PollModel>(
             fromFirestore: (snapshot, _) =>
-                TopicModel.fromJson(snapshot.data()!),
+                PollModel.fromJson(snapshot.data()!),
             toFirestore: (topic, _) => topic.toJson(),
           );
 
   CollectionReference<Map<String, dynamic>> get _openTopicsRef =>
       _firestore.collection(FirestoreSchema.skillTopics);
 
-  Stream<List<TopicModel>> getPolls() {
+  Stream<List<PollModel>> getPolls() {
     return _pollsRef
         .where('status', isEqualTo: 'open')
         .orderBy('created_at', descending: true)
@@ -35,7 +36,7 @@ class TopicRepository {
             snapshot.docs.map((doc) => doc.data()).toList());
   }
 
-  Future<void> createPoll(TopicModel topic) async {
+  Future<void> createPoll(PollModel topic) async {
     await _pollsRef.add(topic);
   }
 

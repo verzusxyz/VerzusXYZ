@@ -13,6 +13,7 @@ class FirestoreSchema {
   static const String tournaments = 'tournaments';
   static const String tournamentParticipants = 'tournament_participants';
   static const String skillTopics = 'skill_topics';
+  static const String polls = 'polls';
   static const String leaderboardEntries = 'leaderboard_entries';
   static const String gameResults = 'game_results';
   static const String systemSettings = 'system_settings';

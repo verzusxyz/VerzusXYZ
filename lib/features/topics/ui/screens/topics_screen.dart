@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:verzus/features/topics/data/models/topic_model.dart';
+import 'package:verzus/features/topics/data/models/poll_model.dart';
 import 'package:verzus/features/topics/data/repositories/topic_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/services/wallet_service.dart';
@@ -106,7 +106,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               unselectedLabelColor:
                   Theme.of(context).colorScheme.onSurfaceVariant,
               indicator: BoxDecoration(
-                color: VerzusColors.primaryPurple.withValues(alpha: 0.1),
+                color: VerzusColors.primaryPurple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               dividerColor: Colors.transparent,
@@ -315,7 +315,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 
                           try {
                             final mode = ref.read(walletModeProvider);
-                            final topic = TopicModel(
+                            final poll = PollModel(
                               id: '',
                               question: q,
                               type: pollType,
@@ -327,7 +327,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                                   mode == WalletKind.demo ? 'demo' : 'live',
                               status: 'open',
                             );
-                            await ref.read(topicRepositoryProvider).createPoll(topic);
+                            await ref.read(topicRepositoryProvider).createPoll(poll);
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Poll created')),
@@ -440,13 +440,13 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      VerzusColors.primaryPurple.withValues(alpha: 0.1),
-                      VerzusColors.primaryPurpleLight.withValues(alpha: 0.05),
+                      VerzusColors.primaryPurple.withOpacity(0.1),
+                      VerzusColors.primaryPurpleLight.withOpacity(0.05),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: VerzusColors.primaryPurple.withValues(alpha: 0.2),
+                    color: VerzusColors.primaryPurple.withOpacity(0.2),
                   ),
                 ),
                 child: Column(
@@ -731,7 +731,7 @@ class _TopicCard extends StatelessWidget {
 }
 
 class _PollCard extends ConsumerWidget {
-  final TopicModel poll;
+  final PollModel poll;
   const _PollCard({required this.poll});
 
   @override
@@ -802,7 +802,7 @@ class _PollCard extends ConsumerWidget {
   }
 }
 
-final pollsProvider = StreamProvider<List<TopicModel>>((ref) {
+final pollsProvider = StreamProvider<List<PollModel>>((ref) {
   return ref.watch(topicRepositoryProvider).getPolls();
 });
 
