@@ -7,6 +7,7 @@ import 'package:verzus/widgets/brand_logo.dart';
 // ignore: unused_import
 import 'package:verzus/theme.dart'; // your provided theme file
 
+// The main landing page for the application.
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
 

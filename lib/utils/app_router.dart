@@ -12,7 +12,7 @@ import 'package:verzus/features/shell/ui/landing/landing_page.dart';
 import 'package:verzus/features/shell/ui/legal/privacy_screen.dart';
 import 'package:verzus/features/shell/ui/legal/terms_screen.dart';
 import 'package:verzus/features/shell/ui/main_wrapper.dart';
-import 'package:verzus/features/shell/ui/profile/profile_screen.dart';
+import 'package:verzus/features/profile/ui/screens/profile_screen.dart';
 import 'package:verzus/features/shell/ui/topics/topics_screen.dart';
 import 'package:verzus/features/tournaments/ui/screens/tournaments_screen.dart';
 import 'package:verzus/features/wallet/ui/screens/wallet_screen.dart';
