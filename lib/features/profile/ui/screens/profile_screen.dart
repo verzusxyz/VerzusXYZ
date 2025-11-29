@@ -113,7 +113,6 @@ class ProfileScreen extends ConsumerWidget {
 
                 const SizedBox(height: 16),
 
-                // KYC Status
                 _buildKycStatusChip(user?.kycStatus),
               ],
             ),
@@ -122,7 +121,7 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 32),
 
           // Stats Section
-          _buildStatsSection(context),
+          _buildStatsSection(context, user),
 
           const SizedBox(height: 32),
 
@@ -181,7 +180,7 @@ class ProfileScreen extends ConsumerWidget {
             context: context,
             icon: Icons.description_rounded,
             title: 'Terms & Conditions',
-            subtitle: 'Read our latest T&C (Effective 25/09/2025)',
+            subtitle: 'Read our latest T&C',
             onTap: () => context.push('/legal/terms'),
           ),
 
@@ -191,7 +190,7 @@ class ProfileScreen extends ConsumerWidget {
             context: context,
             icon: Icons.privacy_tip_rounded,
             title: 'Privacy Policy',
-            subtitle: 'How we handle your data (Effective 25/09/2025)',
+            subtitle: 'How we handle your data',
             onTap: () => context.push('/legal/privacy'),
           ),
 
@@ -253,7 +252,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsSection(BuildContext context) {
+  Widget _buildStatsSection(BuildContext context, user) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -277,15 +276,15 @@ class ProfileScreen extends ConsumerWidget {
                 child: _buildStatItem(
                   context: context,
                   label: 'Matches',
-                  value: '0',
+                  value: user?.totalMatches?.toString() ?? '0',
                   color: VerzusColors.accentGreen,
                 ),
               ),
               Expanded(
                 child: _buildStatItem(
                   context: context,
-                  label: 'Tournaments',
-                  value: '0',
+                  label: 'Wins',
+                  value: user?.totalWins?.toString() ?? '0',
                   color: VerzusColors.accentOrange,
                 ),
               ),
@@ -293,7 +292,8 @@ class ProfileScreen extends ConsumerWidget {
                 child: _buildStatItem(
                   context: context,
                   label: 'Win Rate',
-                  value: '0%',
+                  value:
+                      '${user?.winRate != null ? (user.winRate * 100).toStringAsFixed(0) : 0}%',
                   color: VerzusColors.primaryPurple,
                 ),
               ),
@@ -345,7 +345,7 @@ class ProfileScreen extends ConsumerWidget {
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
           ),
         ),
         child: Row(
@@ -406,24 +406,12 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             ListTile(
-              leading: const Icon(Icons.notifications_rounded),
-              title: const Text('Notifications'),
-              trailing: Switch(
-                value: true,
-                onChanged: (value) {
-                  // TODO: Implement notification toggle
-                },
-                activeColor: VerzusColors.primaryPurple,
-              ),
-            ),
-            ListTile(
               leading: const Icon(Icons.dark_mode_rounded),
               title: const Text('Dark Mode'),
               trailing: Switch(
                 value: ref.read(themeModeProvider) == ThemeMode.dark,
                 onChanged: (value) {
                   ref.read(themeModeProvider.notifier).toggleTheme();
-                  // Close the bottom sheet immediately after toggling
                   Navigator.of(context).pop();
                 },
                 activeColor: VerzusColors.primaryPurple,
@@ -455,7 +443,7 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-                'Share your referral code and earn 1% of platform commission on their first usage!'),
+                'Share your referral code and earn rewards!'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
@@ -479,7 +467,6 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () {
-                      // TODO: Copy to clipboard
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Referral code copied!'),
