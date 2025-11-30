@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/core/services/firebase_service.dart';
+import 'package:verzus/features/topics/data/models/poll_model.dart';
 import 'package:verzus/features/topics/data/models/topic_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 
@@ -15,16 +16,34 @@ class TopicRepository {
 
   FirebaseFirestore get _firestore => _firebaseService.firestore;
 
-  CollectionReference<TopicModel> get _pollsRef =>
-      _firestore.collection(FirestoreSchema.polls).withConverter<TopicModel>(
+  // For Skill Topics
+  CollectionReference<TopicModel> get _topicsRef =>
+      _firestore.collection(FirestoreSchema.skillTopics).withConverter<TopicModel>(
             fromFirestore: (snapshot, _) => TopicModel.fromFirestore(snapshot),
             toFirestore: (topic, _) => topic.toFirestore(),
           );
 
-  CollectionReference<Map<String, dynamic>> get _openTopicsRef =>
-      _firestore.collection(FirestoreSchema.skillTopics);
+  // For Polls
+  CollectionReference<PollModel> get _pollsRef =>
+      _firestore.collection(FirestoreSchema.polls).withConverter<PollModel>(
+            fromFirestore: (snapshot, _) => PollModel.fromFirestore(snapshot),
+            toFirestore: (poll, _) => poll.toFirestore(),
+          );
 
-  Stream<List<TopicModel>> getPolls() {
+  Stream<List<TopicModel>> getTopics() {
+    return _topicsRef
+        .where(SkillTopicDocument.isActive, isEqualTo: true)
+        .orderBy(SkillTopicDocument.name, descending: false)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  Future<void> createTopic(TopicModel topic) async {
+    await _topicsRef.add(topic);
+  }
+
+  Stream<List<PollModel>> getPolls() {
     return _pollsRef
         .where('status', isEqualTo: 'open')
         .orderBy('created_at', descending: true)
@@ -34,27 +53,11 @@ class TopicRepository {
             snapshot.docs.map((doc) => doc.data()).toList());
   }
 
-  Future<void> createPoll(TopicModel topic) async {
-    await _pollsRef.add(topic);
+  Future<void> createPoll(PollModel poll) async {
+    await _pollsRef.add(poll);
   }
 
-  Stream<List<Map<String, dynamic>>> getOpenTopics() {
-    return _openTopicsRef.snapshots().map(
-        (snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
-  }
-
-  Future<void> createOpenTopic(
-      {required String title, String? description}) async {
-    await _openTopicsRef.add({
-      SkillTopicDocument.name: title,
-      SkillTopicDocument.description: description ?? '',
-      SkillTopicDocument.isActive: true,
-      SkillTopicDocument.createdAt: FieldValue.serverTimestamp(),
-      SkillTopicDocument.updatedAt: FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> vote(String pollId, int optionIndex, double entry, String userId, String walletKind) async {
+  Future<void> voteOnPoll(String pollId, int optionIndex, double entry, String userId, String walletKind) async {
     final voteData = {
       'poll_id': pollId,
       'user_id': userId,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:verzus/features/topics/data/models/poll_model.dart';
 import 'package:verzus/features/topics/data/models/topic_model.dart';
 import 'package:verzus/features/topics/data/repositories/topic_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
@@ -12,6 +13,14 @@ import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/features/wallet/providers/wallet_provider.dart';
 import 'package:verzus/widgets/wallet_toggle.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
+
+final pollsProvider = StreamProvider.autoDispose<List<PollModel>>((ref) {
+  return ref.watch(topicRepositoryProvider).getPolls();
+});
+
+final openTopicsProvider = StreamProvider.autoDispose<List<TopicModel>>((ref) {
+  return ref.watch(topicRepositoryProvider).getTopics();
+});
 
 class TopicsScreen extends ConsumerStatefulWidget {
   const TopicsScreen({super.key});
@@ -315,7 +324,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 
                           try {
                             final mode = ref.read(walletModeProvider);
-                            final topic = TopicModel(
+                            final poll = PollModel(
                               id: '',
                               question: q,
                               type: pollType,
@@ -328,7 +337,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                               status: 'open',
                               createdAt: Timestamp.now(),
                             );
-                            await ref.read(topicRepositoryProvider).createPoll(topic);
+                            await ref.read(topicRepositoryProvider).createPoll(poll);
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Poll created')),
@@ -512,10 +521,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                   if (isNarrow) {
                     return Column(
                       children: list.map((t) {
-                        final title = t[SkillTopicDocument.name] as String? ?? 'Topic';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _TopicCard(title: title),
+                          child: _TopicCard(topic: t),
                         );
                       }).toList(),
                     );
@@ -533,8 +541,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                       itemCount: list.length,
                       itemBuilder: (context, index) {
                         final t = list[index];
-                        final title = t[SkillTopicDocument.name] as String? ?? 'Topic';
-                        return _TopicCard(title: title);
+                        return _TopicCard(topic: t);
                       },
                     );
                   }
@@ -669,8 +676,20 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 final desc = descController.text.trim();
                 if (title.isEmpty) return;
                 try {
-                  await ref.read(topicRepositoryProvider).createOpenTopic(
-                      title: title, description: desc.isEmpty ? null : desc);
+                  final topic = TopicModel(
+                    id: '',
+                    name: title,
+                    description: desc,
+                    category: '',
+                    iconUrl: '',
+                    isActive: true,
+                    minWager: 0,
+                    maxWager: 0,
+                    gameConfig: {},
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+                  await ref.read(topicRepositoryProvider).createTopic(topic);
                   if (mounted) {
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -697,8 +716,8 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 }
 
 class _TopicCard extends StatelessWidget {
-  final String title;
-  const _TopicCard({required this.title});
+  final TopicModel topic;
+  const _TopicCard({required this.topic});
 
   @override
   Widget build(BuildContext context) {
@@ -715,7 +734,7 @@ class _TopicCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              title,
+              topic.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context)
@@ -732,7 +751,7 @@ class _TopicCard extends StatelessWidget {
 }
 
 class _PollCard extends ConsumerWidget {
-  final TopicModel poll;
+  final PollModel poll;
   const _PollCard({required this.poll});
 
   @override
@@ -788,7 +807,7 @@ class _PollCard extends ConsumerWidget {
             .read(walletServiceProvider)
             .lockFunds(auth.uid, poll.entryFee, kind: mode);
       }
-      await ref.read(topicRepositoryProvider).vote(poll.id, optionIndex, poll.entryFee, auth.uid, mode == WalletKind.demo ? 'demo' : 'live');
+      await ref.read(topicRepositoryProvider).voteOnPoll(poll.id, optionIndex, poll.entryFee, auth.uid, mode == WalletKind.demo ? 'demo' : 'live');
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Vote recorded')));
@@ -802,11 +821,3 @@ class _PollCard extends ConsumerWidget {
     }
   }
 }
-
-final pollsProvider = StreamProvider<List<TopicModel>>((ref) {
-  return ref.watch(topicRepositoryProvider).getPolls();
-});
-
-final openTopicsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
-  return ref.watch(topicRepositoryProvider).getOpenTopics();
-});
