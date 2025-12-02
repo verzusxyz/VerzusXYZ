@@ -13,7 +13,6 @@ class TopicRepository {
   TopicRepository({required FirebaseFirestore firestore})
       : _firestore = firestore;
 
-  // For Skill Topics
   CollectionReference<TopicModel> get _topicsRef => _firestore
       .collection(FirestoreSchema.skillTopics)
       .withConverter<TopicModel>(
@@ -23,20 +22,15 @@ class TopicRepository {
 
   Stream<List<TopicModel>> getTopics() {
     return _topicsRef
-        .where(SkillTopicDocument.status, isEqualTo: 'open')
-        .orderBy(SkillTopicDocument.question, descending: false)
+        .where(SkillTopicDocument.isActive, isEqualTo: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
-  Future<String> createTopic(TopicModel topic, String? s,
-      {required String question, required List<String> options}) async {
+  Future<String> createTopic(TopicModel topic) async {
     try {
-      final topicRef = _firestore.collection(FirestoreSchema.skillTopics).doc();
-      final topicData = topic.toFirestore();
-      topicData['id'] = topicRef.id;
-      await topicRef.set(topicData);
-      return topicRef.id;
+      final docRef = await _topicsRef.add(topic);
+      return docRef.id;
     } on FirebaseException {
       rethrow;
     }

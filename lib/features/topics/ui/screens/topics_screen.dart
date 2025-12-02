@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/topics/data/models/topic_model.dart';
-import 'package:verzus/features/topics/data/models/polls_model.dart';
+import 'package:verzus/features/topics/polls/data/models/poll_model.dart';
 import 'package:verzus/features/topics/data/repositories/topic_repository.dart';
-import 'package:verzus/features/topics/data/repositories/polls_repository.dart';
+import 'package:verzus/features/topics/polls/data/repositories/poll_repository.dart';
+import 'package:verzus/features/topics/polls/data/models/vote_model.dart';
+import 'package:verzus/features/topics/polls/data/repositories/vote_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/services/auth_service.dart';
@@ -26,6 +28,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   late TextEditingController entryCtrl;
   late List<TextEditingController> optionCtrls;
   String pollType = 'yes_no';
+  String? selectedTopicId;
 
   @override
   void initState() {
@@ -79,7 +82,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               child: WalletToggle(
                 groupValue: mode,
                 onSelectionChanged: (v) =>
-                    // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
                     ref.read(walletModeProvider.notifier).state = v,
               ),
             );
@@ -98,7 +100,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
             child: TabBar(
               controller: _tabController,
               tabs: const [
-                Tab(text: 'Create Topic/Poll'),
+                Tab(text: 'Create Poll'),
                 Tab(text: 'Join Poll'),
                 Tab(text: 'Live Topics'),
               ],
@@ -106,7 +108,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               unselectedLabelColor:
                   Theme.of(context).colorScheme.onSurfaceVariant,
               indicator: BoxDecoration(
-                // ignore: deprecated_member_use
                 color: VerzusColors.primaryPurple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -133,6 +134,8 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   }
 
   Widget _buildCreatePoll() {
+    final topicsAsync = ref.watch(openTopicsProvider);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 500; // Responsive check
@@ -144,7 +147,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
             children: [
               const SizedBox(height: 12),
               Text(
-                'Create Topic / Poll',
+                'Create Poll',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
@@ -159,6 +162,32 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 ),
                 child: Column(
                   children: [
+                    topicsAsync.when(
+                      data: (topics) => DropdownButtonFormField<String>(
+                        value: selectedTopicId,
+                        items: topics
+                            .map((t) => DropdownMenuItem(
+                                  value: t.id,
+                                  child: Text(t.name),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() {
+                            selectedTopicId = v;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Select Topic',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      loading: () => const CircularProgressIndicator(),
+                      error: (e, _) =>
+                          Text('Error loading topics', style: TextStyle(color: Colors.red)),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: questionCtrl,
                       decoration: InputDecoration(
@@ -303,6 +332,12 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                       width: double.infinity,
                       child: VerzusButton(
                         onPressed: () async {
+                          if (selectedTopicId == null) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select a topic')),
+                              );
+                            return;
+                          }
                           final q = questionCtrl.text.trim();
                           final entry = double.tryParse(entryCtrl.text) ?? 0.0;
                           if (q.isEmpty || entry < 0) return;
@@ -316,8 +351,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 
                           try {
                             final mode = ref.read(walletModeProvider);
-                            final topic = TopicModel(
+                            final poll = PollModel(
                               id: '',
+                              topicId: selectedTopicId!,
                               question: q,
                               pollType: pollType,
                               options: pollType == 'yes_no'
@@ -331,9 +367,8 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                             );
                             await ref
                                 .read(pollRepositoryProvider)
-                                .createPoll(pollsProvider as PollsModel);
+                                .createPoll(selectedTopicId!, poll);
                             if (mounted) {
-                              // ignore: use_build_context_synchronously
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Poll created')),
                               );
@@ -345,7 +380,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                             }
                           } catch (e) {
                             if (mounted) {
-                              // ignore: use_build_context_synchronously
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Failed: $e'),
@@ -369,7 +403,43 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   }
 
   Widget _buildJoinPolls() {
-    final pollsStream = ref.watch(pollsProvider);
+    final topicsAsync = ref.watch(openTopicsProvider);
+    return topicsAsync.when(
+      data: (topics) {
+        if (topics.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.topic,
+            title: 'No Topics Yet!',
+            subtitle: 'Create a topic to start a poll.',
+          );
+        }
+        return ListView.builder(
+          itemCount: topics.length,
+          itemBuilder: (context, index) {
+            final topic = topics[index];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    topic.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                _buildPollsList(topic.id),
+              ],
+            );
+          },
+        );
+      },
+      loading: () => Center(child: CircularProgressIndicator()),
+      error: (e, _) => _buildErrorNotice(context, e),
+    );
+  }
+
+  Widget _buildPollsList(String topicId) {
+    final pollsStream = ref.watch(pollsProvider(topicId));
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 600;
@@ -446,15 +516,12 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      // ignore: deprecated_member_use
                       VerzusColors.primaryPurple.withOpacity(0.1),
-                      // ignore: deprecated_member_use
                       VerzusColors.primaryPurpleLight.withOpacity(0.05),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    // ignore: deprecated_member_use
                     color: VerzusColors.primaryPurple.withOpacity(0.2),
                   ),
                 ),
@@ -520,10 +587,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                   if (isNarrow) {
                     return Column(
                       children: list.map((t) {
-                        final question = t.question;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _TopicCard(question: question),
+                          child: _TopicCard(topic: t),
                         );
                       }).toList(),
                     );
@@ -541,8 +607,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                       itemCount: list.length,
                       itemBuilder: (context, index) {
                         final t = list[index];
-                        final question = t.question;
-                        return _TopicCard(question: question);
+                        return _TopicCard(topic: t);
                       },
                     );
                   }
@@ -576,9 +641,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
           Icon(
             icon,
             size: 64,
-            color:
-                // ignore: deprecated_member_use
-                Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -595,7 +658,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                   color: Theme.of(context)
                       .colorScheme
                       .onSurfaceVariant
-                      // ignore: deprecated_member_use
                       .withOpacity(0.7),
                 ),
             textAlign: TextAlign.center,
@@ -619,6 +681,9 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   Widget _buildCreateTopicSheet() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
+    final categoryController = TextEditingController();
+    final iconUrlController = TextEditingController();
+
     return Container(
       padding: EdgeInsets.only(
         left: 24,
@@ -668,20 +733,44 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
             minLines: 2,
             maxLines: 5,
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: categoryController,
+            decoration: InputDecoration(
+              labelText: 'Category',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+           const SizedBox(height: 12),
+          TextField(
+            controller: iconUrlController,
+            decoration: InputDecoration(
+              labelText: 'Icon URL',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: VerzusButton(
               onPressed: () async {
-                final String question = titleController.text.trim();
-                final String options = descController.text.trim();
-                if (question.isEmpty) return;
+                final String name = titleController.text.trim();
+                if (name.isEmpty) return;
                 try {
+                  final topic = TopicModel(
+                    id: '',
+                    name: name,
+                    description: descController.text.trim(),
+                    category: categoryController.text.trim(),
+                    iconUrl: iconUrlController.text.trim(),
+                    isActive: true,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
                   await ref.read(topicRepositoryProvider).createTopic(
-                    question as TopicModel,
-                    options,
-                    question: '',
-                    options: [],
+                    topic
                   );
                   if (mounted) {
                     Navigator.of(context).pop();
@@ -709,8 +798,8 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
 }
 
 class _TopicCard extends StatelessWidget {
-  final String question;
-  const _TopicCard({required this.question});
+  final TopicModel topic;
+  const _TopicCard({required this.topic});
 
   @override
   Widget build(BuildContext context) {
@@ -727,7 +816,7 @@ class _TopicCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              question,
+              topic.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context)
@@ -736,7 +825,7 @@ class _TopicCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
-          VerzusButton.outline(onPressed: () {}, child: const Text('Stake')),
+          VerzusButton.outline(onPressed: () {}, child: const Text('View Polls')),
         ],
       ),
     );
@@ -744,9 +833,8 @@ class _TopicCard extends StatelessWidget {
 }
 
 class _PollCard extends ConsumerWidget {
-  final PollsModel poll;
-  final TopicModel? topic;
-  const _PollCard({required this.poll, this.topic});
+  final PollModel poll;
+  const _PollCard({required this.poll});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -759,7 +847,7 @@ class _PollCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(topic?.question ?? '',
+          Text(poll.question,
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
@@ -769,10 +857,10 @@ class _PollCard extends ConsumerWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (int i = 0; i < (poll.optionIndex.length ?? 0); i++)
+              for (int i = 0; i < poll.options.length; i++)
                 VerzusButton.outline(
                   onPressed: () => _vote(context, ref, i),
-                  child: Text(poll.optionIndex[i]),
+                  child: Text(poll.options[i]),
                 ),
             ],
           ),
@@ -802,12 +890,15 @@ class _PollCard extends ConsumerWidget {
             .read(walletServiceProvider)
             .lockFunds(auth.uid, poll.entryFee, kind: mode);
       }
-      await ref.read(pollRepositoryProvider).voteOnPoll(
-          poll.pollId,
-          optionIndex,
-          poll.entryFee,
-          auth.uid,
-          mode == WalletKind.demo ? 'demo' : 'live');
+      final vote = VoteModel(
+        pollId: poll.id,
+        userId: auth.uid,
+        optionIndex: optionIndex.toString(),
+        entryFee: poll.entryFee,
+        walletKind: mode,
+        createdAt: DateTime.now(),
+      );
+      await ref.read(voteRepositoryProvider).vote(poll.topicId, poll.id, vote);
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Vote recorded')));
@@ -822,8 +913,9 @@ class _PollCard extends ConsumerWidget {
   }
 }
 
-final pollsProvider = StreamProvider<List<PollsModel>>((ref) {
-  return ref.watch(pollRepositoryProvider).getPolls();
+final pollsProvider =
+    StreamProvider.family<List<PollModel>, String>((ref, topicId) {
+  return ref.watch(pollRepositoryProvider).getPolls(topicId);
 });
 
 final openTopicsProvider = StreamProvider<List<TopicModel>>((ref) {
