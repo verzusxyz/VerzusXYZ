@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/topics/data/models/topic_model.dart';
-import 'package:verzus/features/topics/data/models/polls_model.dart';
+import 'package:verzus/features/topics/data/models/vote_model.dart';
 import 'package:verzus/features/topics/data/repositories/topic_repository.dart';
-import 'package:verzus/features/topics/data/repositories/polls_repository.dart';
+import 'package:verzus/features/topics/data/repositories/vote_repository.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/services/auth_service.dart';
@@ -79,7 +79,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               child: WalletToggle(
                 groupValue: mode,
                 onSelectionChanged: (v) =>
-                    // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
                     ref.read(walletModeProvider.notifier).state = v,
               ),
             );
@@ -106,7 +105,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
               unselectedLabelColor:
                   Theme.of(context).colorScheme.onSurfaceVariant,
               indicator: BoxDecoration(
-                // ignore: deprecated_member_use
                 color: VerzusColors.primaryPurple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -330,12 +328,11 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                               updatedAt: DateTime.now(),
                             );
                             await ref
-                                .read(pollRepositoryProvider)
-                                .createPoll(pollsProvider as PollsModel);
+                                .read(topicRepositoryProvider)
+                                .createTopic(topic);
                             if (mounted) {
-                              // ignore: use_build_context_synchronously
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Poll created')),
+                                const SnackBar(content: Text('Topic created')),
                               );
                               questionCtrl.clear();
                               entryCtrl.text = '1.00';
@@ -345,7 +342,6 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                             }
                           } catch (e) {
                             if (mounted) {
-                              // ignore: use_build_context_synchronously
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Failed: $e'),
@@ -355,7 +351,7 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
                             }
                           }
                         },
-                        child: const Text('Create Poll'),
+                        child: const Text('Create Topic'),
                       ),
                     ),
                   ],
@@ -369,198 +365,54 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
   }
 
   Widget _buildJoinPolls() {
-    final pollsStream = ref.watch(pollsProvider);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 600;
-        return pollsStream.when(
-          data: (docs) {
-            if (docs.isEmpty) {
-              return _buildEmptyState(
-                icon: Icons.how_to_vote_rounded,
-                title: 'No Open Polls Yet!',
-                subtitle:
-                    'Spark some excitement—create a poll and invite the community to join in!',
-              );
-            }
-            if (isNarrow) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: docs
-                      .map((d) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _PollCard(poll: d),
-                          ))
-                      .toList(),
-                ),
-              );
-            } else {
-              return GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 1.5,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final d = docs[index];
-                  return _PollCard(poll: d);
-                },
-              );
-            }
-          },
-          loading: () => SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                for (int i = 0; i < 4; i++) ...[
-                  VerzusShimmers.listTile(),
-                  const SizedBox(height: 12),
-                ]
-              ],
-            ),
+    final topicsAsync = ref.watch(closedTopicsProvider);
+    return topicsAsync.when(
+      data: (docs) {
+        if (docs.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.how_to_vote_rounded,
+            title: 'No Polls to Join!',
+            subtitle:
+                'There are no invited or closed polls for you at the moment.',
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _TopicResultCard(topic: docs[index]),
           ),
-          error: (e, _) => _buildErrorNotice(context, e),
         );
       },
+      loading: () => VerzusShimmers.listTile(),
+      error: (e, _) => _buildErrorNotice(context, e),
     );
   }
 
   Widget _buildLiveTopics() {
     final topicsAsync = ref.watch(openTopicsProvider);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 600;
-        return SingleChildScrollView(
+    return topicsAsync.when(
+      data: (docs) {
+        if (docs.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.poll_rounded,
+            title: 'No Live Topics Right Now',
+            subtitle:
+                'Ignite the conversation—create the first community topic and let the stakes begin!',
+          );
+        }
+        return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Create Topic Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      // ignore: deprecated_member_use
-                      VerzusColors.primaryPurple.withOpacity(0.1),
-                      // ignore: deprecated_member_use
-                      VerzusColors.primaryPurpleLight.withOpacity(0.05),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    // ignore: deprecated_member_use
-                    color: VerzusColors.primaryPurple.withOpacity(0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.add_circle_outline_rounded,
-                          color: VerzusColors.primaryPurple,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Create Open Topic',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: VerzusColors.primaryPurple,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Community-voted topics where majority stakes determine outcomes',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    VerzusButton(
-                      onPressed: _showCreateTopicDialog,
-                      size: VerzusButtonSize.medium,
-                      child: const Text('Create Topic'),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              Text(
-                'Community Topics',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-
-              topicsAsync.when(
-                data: (list) {
-                  if (list.isEmpty) {
-                    return _buildEmptyState(
-                      icon: Icons.poll_rounded,
-                      title: 'No Live Topics Right Now',
-                      subtitle:
-                          'Ignite the conversation—create the first community topic and let the stakes begin!',
-                    );
-                  }
-                  if (isNarrow) {
-                    return Column(
-                      children: list.map((t) {
-                        final question = t.question;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _TopicCard(question: question),
-                        );
-                      }).toList(),
-                    );
-                  } else {
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 3,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: list.length,
-                      itemBuilder: (context, index) {
-                        final t = list[index];
-                        final question = t.question;
-                        return _TopicCard(question: question);
-                      },
-                    );
-                  }
-                },
-                loading: () => Column(
-                  children: [
-                    for (int i = 0; i < 4; i++) ...[
-                      VerzusShimmers.listTile(),
-                      const SizedBox(height: 12),
-                    ]
-                  ],
-                ),
-                error: (e, _) => _buildErrorNotice(context, e),
-              ),
-            ],
+          itemCount: docs.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _TopicResultCard(topic: docs[index]),
           ),
         );
       },
+      loading: () => VerzusShimmers.listTile(),
+      error: (e, _) => _buildErrorNotice(context, e),
     );
   }
 
@@ -570,187 +422,52 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen>
     required String subtitle,
   }) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color:
-                // ignore: deprecated_member_use
-                Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurfaceVariant
-                      // ignore: deprecated_member_use
-                      .withOpacity(0.7),
-                ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCreateTopicDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _buildCreateTopicSheet(),
-    );
-  }
-
-  Widget _buildCreateTopicSheet() {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    return Container(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Text(
-                'Create Topic',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: titleController,
-            decoration: InputDecoration(
-              labelText: 'Topic Title',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: descController,
-            decoration: InputDecoration(
-              labelText: 'Description (optional)',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.center,
             ),
-            minLines: 2,
-            maxLines: 5,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: VerzusButton(
-              onPressed: () async {
-                final String question = titleController.text.trim();
-                final String options = descController.text.trim();
-                if (question.isEmpty) return;
-                try {
-                  await ref.read(topicRepositoryProvider).createTopic(
-                    question as TopicModel,
-                    options,
-                    question: '',
-                    options: [],
-                  );
-                  if (mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Topic created')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('Failed: $e'),
-                          backgroundColor: VerzusColors.dangerRed),
-                    );
-                  }
-                }
-              },
-              child: const Text('Create'),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withOpacity(0.7),
+                  ),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _TopicCard extends StatelessWidget {
-  final String question;
-  const _TopicCard({required this.question});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.poll_rounded, color: VerzusColors.primaryPurple),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              question,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          VerzusButton.outline(onPressed: () {}, child: const Text('Stake')),
-        ],
-      ),
-    );
-  }
-}
-
-class _PollCard extends ConsumerWidget {
-  final PollsModel poll;
-  final TopicModel? topic;
-  const _PollCard({required this.poll, this.topic});
+class _TopicResultCard extends ConsumerWidget {
+  final TopicModel topic;
+  const _TopicResultCard({required this.topic});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final votesAsync = ref.watch(topicVotesProvider(topic.id));
     final cs = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -759,29 +476,66 @@ class _PollCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(topic?.question ?? '',
+          Text(topic.question,
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
                   ?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (int i = 0; i < (poll.optionIndex.length ?? 0); i++)
-                VerzusButton.outline(
-                  onPressed: () => _vote(context, ref, i),
-                  child: Text(poll.optionIndex[i]),
-                ),
-            ],
+          const SizedBox(height: 12),
+          votesAsync.when(
+            data: (votes) {
+              final totalVotes = votes.length;
+              return Column(
+                children: List.generate(topic.options.length, (index) {
+                  final optionVotes = votes
+                      .where((v) => v.optionIndex == index.toString())
+                      .length;
+                  final percentage = totalVotes > 0 ? optionVotes / totalVotes : 0.0;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(topic.options[index]),
+                            Text('${(percentage * 100).toStringAsFixed(0)}%'),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: percentage,
+                          backgroundColor: cs.surfaceContainer,
+                          color: VerzusColors.primaryPurple,
+                        ),
+                        if (topic.status == 'open')
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: VerzusButton.text(
+                              onPressed: () => _vote(context, ref, index),
+                              child: const Text('Vote'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error loading votes: $e'),
           ),
           const SizedBox(height: 8),
-          Text('Entry: \$${poll.entryFee.toStringAsFixed(2)}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant)),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text('Entry: \$${topic.entryFee.toStringAsFixed(2)}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant)),
+          ),
         ],
       ),
     );
@@ -797,17 +551,24 @@ class _PollCard extends ConsumerWidget {
     }
     final mode = ref.read(walletModeProvider);
     try {
-      if (poll.entryFee > 0) {
+      if (topic.entryFee > 0) {
         await ref
             .read(walletServiceProvider)
-            .lockFunds(auth.uid, poll.entryFee, kind: mode);
+            .lockFunds(auth.uid, topic.entryFee, kind: mode);
       }
-      await ref.read(pollRepositoryProvider).voteOnPoll(
-          poll.pollId,
-          optionIndex,
-          poll.entryFee,
-          auth.uid,
-          mode == WalletKind.demo ? 'demo' : 'live');
+
+      final vote = VoteModel(
+        voteId: '', // Firestore will generate
+        topicId: topic.id,
+        userId: auth.uid,
+        optionIndex: optionIndex.toString(),
+        entryFee: topic.entryFee,
+        walletKind: mode,
+        createdAt: DateTime.now(),
+      );
+
+      await ref.read(voteRepositoryProvider).createVote(topic.id, vote);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Vote recorded')));
@@ -822,10 +583,14 @@ class _PollCard extends ConsumerWidget {
   }
 }
 
-final pollsProvider = StreamProvider<List<PollsModel>>((ref) {
-  return ref.watch(pollRepositoryProvider).getPolls();
+final topicVotesProvider = StreamProvider.family<List<VoteModel>, String>((ref, topicId) {
+  return ref.watch(voteRepositoryProvider).getVotes(topicId);
 });
 
 final openTopicsProvider = StreamProvider<List<TopicModel>>((ref) {
-  return ref.watch(topicRepositoryProvider).getTopics();
+  return ref.watch(topicRepositoryProvider).getOpenTopics();
+});
+
+final closedTopicsProvider = StreamProvider<List<TopicModel>>((ref) {
+  return ref.watch(topicRepositoryProvider).getClosedTopics();
 });
