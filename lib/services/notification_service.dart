@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:verzus/features/auth/data/models/user_model.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
 import 'package:verzus/features/matches/data/repositories/match_repository.dart';

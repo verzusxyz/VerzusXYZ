@@ -14,7 +14,7 @@ class TopicsService {
   Stream<List<Map<String, dynamic>>> streamOpenTopics() {
     return _firestore
         .collection(FirestoreSchema.skillTopics)
-        .where(SkillTopicDocument.isActive, isEqualTo: true)
+        .where(SkillTopicDocument.status, isEqualTo: 'open')
         .orderBy(SkillTopicDocument.createdAt, descending: true)
         .limit(50)
         .snapshots()
@@ -22,16 +22,18 @@ class TopicsService {
   }
 
   Future<void> createOpenTopic({
-    required String title,
-    String? description,
+    required String question,
+    List<String>? options,
+    required String pollType,
+    required String status,
   }) async {
     final ref = _firestore.collection(FirestoreSchema.skillTopics).doc();
     await ref.set({
       SkillTopicDocument.id: ref.id,
-      SkillTopicDocument.name: title,
-      SkillTopicDocument.description: description,
-      SkillTopicDocument.category: 'open',
-      SkillTopicDocument.isActive: true,
+      SkillTopicDocument.question: question,
+      SkillTopicDocument.options: options,
+      SkillTopicDocument.pollType: pollType,
+      SkillTopicDocument.status: status,
       SkillTopicDocument.createdAt: FieldValue.serverTimestamp(),
       SkillTopicDocument.updatedAt: FieldValue.serverTimestamp(),
     });

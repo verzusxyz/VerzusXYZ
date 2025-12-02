@@ -1,26 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:verzus/core/services/firebase_service.dart';
-import 'package:verzus/features/wallet/data/models/affiliate_level_model.dart';
-import 'package:verzus/features/wallet/data/models/platform_fee_model.dart';
+import 'package:verzus/features/admin/data/models/affiliate_level_model.dart';
+import 'package:verzus/features/admin/data/models/platform_fee_model.dart';
 
-final adminServiceProvider = Provider<AdminService>((ref) {
-  return AdminService(ref.read(firebaseServiceProvider));
+final adminRepository = Provider<AdminRepository>((ref) {
+  return AdminRepository(firestore: FirebaseFirestore.instance);
 });
 
-class AdminService {
-  final FirebaseService _firebaseService;
+class AdminRepository {
+  final FirebaseFirestore _firestore;
 
-  AdminService(this._firebaseService);
+  AdminRepository({required FirebaseFirestore firestore})
+      : _firestore = firestore;
 
-  FirebaseFirestore get _firestore => _firebaseService.firestore;
-
-  CollectionReference<AffiliateLevelModel> get _affiliateLevelsRef =>
-      _firestore.collection('affiliate_levels').withConverter<AffiliateLevelModel>(
-            fromFirestore: (snapshot, _) =>
-                AffiliateLevelModel.fromJson(snapshot.data()!),
-            toFirestore: (level, _) => level.toJson(),
-          );
+  CollectionReference<AffiliateLevelModel> get _affiliateLevelsRef => _firestore
+      .collection('affiliate_levels')
+      .withConverter<AffiliateLevelModel>(
+        fromFirestore: (snapshot, _) =>
+            AffiliateLevelModel.fromJson(snapshot.data()!),
+        toFirestore: (level, _) => level.toJson(),
+      );
 
   CollectionReference<PlatformFeeModel> get _platformFeesRef =>
       _firestore.collection('platform_fees').withConverter<PlatformFeeModel>(

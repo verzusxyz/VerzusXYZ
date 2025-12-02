@@ -13,6 +13,7 @@ class FirestoreSchema {
   static const String tournaments = 'tournaments';
   static const String tournamentParticipants = 'tournament_participants';
   static const String skillTopics = 'skill_topics';
+  static const String polls = 'polls';
   static const String leaderboardEntries = 'leaderboard_entries';
   static const String gameResults = 'game_results';
   static const String systemSettings = 'system_settings';
@@ -120,19 +121,23 @@ class TournamentDocument {
   static const String maxParticipants = 'max_participants';
   static const String currentParticipants = 'current_participants';
   static const String status = 'status';
-  static const String tournamentType = 'tournament_type'; // single_elim, double_elim, round_robin, pools_knockout
+  static const String tournamentType =
+      'tournament_type'; // single_elim, double_elim, round_robin, pools_knockout
   static const String startDate = 'start_date';
   static const String endDate = 'end_date';
   static const String registrationDeadline = 'registration_deadline';
   static const String rules = 'rules';
-  static const String platformFee = 'platform_fee'; // computed upon payout (20% default)
+  static const String platformFee =
+      'platform_fee'; // computed upon payout (20% default)
   static const String createdAt = 'created_at';
   static const String updatedAt = 'updated_at';
   // Extended fields for user-created tournaments
   static const String visibility = 'visibility'; // public, private
   static const String inviteCode = 'invite_code'; // for private tournaments
-  static const String payoutMode = 'payout_mode'; // winner_takes_all, top3, custom
-  static const String payoutRatios = 'payout_ratios'; // map: rank->percentage, must sum to 100
+  static const String payoutMode =
+      'payout_mode'; // winner_takes_all, top3, custom
+  static const String payoutRatios =
+      'payout_ratios'; // map: rank->percentage, must sum to 100
   static const String checkinDeadlineMins = 'checkin_deadline_mins';
   static const String matchDeadlineMins = 'match_deadline_mins';
   static const String matchBestOf = 'match_best_of'; // 1,3,5
@@ -142,12 +147,16 @@ class TournamentDocument {
   static const String gameId = 'game_id';
   static const String inviteLinks = 'invite_links'; // array of shareable links
   static const String createdInviteCount = 'created_invite_count';
-  static const String entryFeesTotal = 'entry_fees_total'; // running total of entries
+  static const String entryFeesTotal =
+      'entry_fees_total'; // running total of entries
   static const String commissionRate = 'commission_rate'; // default 0.20
-  static const String bracket = 'bracket'; // serialized bracket tree or schedule
+  static const String bracket =
+      'bracket'; // serialized bracket tree or schedule
   // Dispute & notifications
-  static const String disputePolicy = 'dispute_policy'; // creator_judge, admin, community
-  static const String judgeUserId = 'judge_user_id'; // defaults to creator_id when creator_judge
+  static const String disputePolicy =
+      'dispute_policy'; // creator_judge, admin, community
+  static const String judgeUserId =
+      'judge_user_id'; // defaults to creator_id when creator_judge
   static const String notifyOnPairing = 'notify_on_pairing';
   static const String notifyOnDeadline = 'notify_on_deadline';
 }
@@ -166,16 +175,24 @@ class TournamentParticipantDocument {
 /// Skill topic document structure
 class SkillTopicDocument {
   static const String id = 'id';
-  static const String name = 'name';
-  static const String description = 'description';
-  static const String category = 'category';
-  static const String iconUrl = 'icon_url';
-  static const String isActive = 'is_active';
-  static const String minWager = 'min_wager';
-  static const String maxWager = 'max_wager';
-  static const String gameConfig = 'game_config';
+  static const String question = 'question';
+  static const String pollType = 'poll_type';
+  static const String entryFee = 'entry_fee';
+  static const String options = 'options';
+  static const String walletKind = 'wallet_kind';
+  static const String status = 'status';
   static const String createdAt = 'created_at';
   static const String updatedAt = 'updated_at';
+}
+
+//// Polls document structure
+class PollsDocument {
+  static const String pollId = 'poll_id';
+  static const String userId = 'user_id';
+  static const String optionIndex = 'option_index';
+  static const String entryFee = 'entry_fee';
+  static const String createdAt = 'created_at';
+  static const String walletKind = 'wallet_kind';
 }
 
 /// Leaderboard entry document structure
@@ -251,14 +268,14 @@ class FirestoreConstants {
   static const String matchStatusCompleted = 'completed';
   static const String matchStatusCancelled = 'cancelled';
   static const String matchStatusDisputed = 'disputed';
-  
+
   // Tournament status values
   static const String tournamentStatusDraft = 'draft';
   static const String tournamentStatusOpen = 'open';
   static const String tournamentStatusStarted = 'started';
   static const String tournamentStatusCompleted = 'completed';
   static const String tournamentStatusCancelled = 'cancelled';
-  
+
   // Transaction types
   static const String transactionTypeDeposit = 'deposit';
   static const String transactionTypeWithdrawal = 'withdrawal';
@@ -266,25 +283,25 @@ class FirestoreConstants {
   static const String transactionTypeWin = 'win';
   static const String transactionTypeFee = 'fee';
   static const String transactionTypeRefund = 'refund';
-  
+
   // Transaction status values
   static const String transactionStatusPending = 'pending';
   static const String transactionStatusCompleted = 'completed';
   static const String transactionStatusFailed = 'failed';
   static const String transactionStatusCancelled = 'cancelled';
-  
+
   // Match types
   static const String matchTypeQuickPlay = 'quick_play';
   static const String matchTypeSkillBased = 'skill_based';
   static const String matchTypePrivate = 'private';
   static const String matchTypeTournament = 'tournament';
-  
+
   // Invitation status values
   static const String invitationStatusPending = 'pending';
   static const String invitationStatusAccepted = 'accepted';
   static const String invitationStatusDeclined = 'declined';
   static const String invitationStatusExpired = 'expired';
-  
+
   // System setting keys
   static const String settingPlatformFeeRate = 'platform_fee_rate';
   static const String settingMinWagerAmount = 'min_wager_amount';
@@ -302,17 +319,17 @@ class FirestoreHelpers {
     if (timestamp is String && timestamp == 'TIMESTAMP') return DateTime.now();
     return null;
   }
-  
+
   /// Convert DateTime to Firestore timestamp
   static Timestamp dateTimeToTimestamp(DateTime dateTime) {
     return Timestamp.fromDate(dateTime);
   }
-  
+
   /// Get current timestamp for Firestore
   static Timestamp getCurrentTimestamp() {
     return Timestamp.now();
   }
-  
+
   /// Generate a new document ID
   static String generateDocumentId() {
     return FirebaseFirestore.instance.collection('temp').doc().id;

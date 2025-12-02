@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
-import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/features/wallet/data/repositories/affiliate_repository.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -65,7 +64,8 @@ class AffiliateScreen extends ConsumerWidget {
                       final item = history[index];
                       return ListTile(
                         leading: const Icon(Icons.person),
-                        title: Text('Referred user ${item['referred_user_id']}'),
+                        title:
+                            Text('Referred user ${item['referred_user_id']}'),
                         trailing: Text('+\$${item['amount']}'),
                       );
                     },
@@ -84,10 +84,13 @@ class AffiliateScreen extends ConsumerWidget {
   }
 }
 
-final affiliateHistoryProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+final affiliateHistoryProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   final authUser = ref.watch(authRepositoryProvider).currentUser;
   if (authUser != null) {
-    return ref.watch(affiliateRepositoryProvider).getAffiliateHistory(authUser.uid);
+    return ref
+        .watch(affiliateRepositoryProvider)
+        .getAffiliateHistory(authUser.uid);
   }
   return Stream.value([]);
 });

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+import 'package:verzus/core/constants/walkthrough_keys.dart';
 import 'package:verzus/services/walkthrough_service.dart';
 import 'package:verzus/utils/responsive.dart';
 import 'package:verzus/widgets/brand_logo.dart';
@@ -22,11 +23,20 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final walkthroughService = ref.read(walkthroughServiceProvider);
-      if (walkthroughService != null &&
-          !walkthroughService.isMainWalkthroughComplete()) {
-        walkthroughService.startMainWalkthrough(context);
+      if (await walkthroughService.shouldShowWalkthrough()) {
+        final currentStep = await walkthroughService.getCurrentStep();
+        if (currentStep == 0) {
+          // ignore: use_build_context_synchronously
+          walkthroughService.startWalkthrough(context, [
+            WalkthroughKeys.matchesTab,
+            WalkthroughKeys.tournamentsTab,
+            WalkthroughKeys.walletTab,
+            WalkthroughKeys.profileTab,
+          ]);
+          await walkthroughService.setCurrentStep(1);
+        }
       }
     });
   }
@@ -80,6 +90,7 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
         defaultTargetPlatform == TargetPlatform.linux;
     final useSidebar =
         (kIsWeb || isDesktop) && responsive.widthPercent(1) >= 900;
+    final walkthroughService = ref.read(walkthroughServiceProvider);
 
     if (useSidebar) {
       final currentPath = GoRouterState.of(context).uri.toString();
@@ -102,11 +113,21 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
                       color: Theme.of(context)
                           .colorScheme
                           .outline
+                          // ignore: deprecated_member_use
                           .withOpacity(0.15),
                       width: 0.5,
                     )),
                   ),
-                  child: widget.child,
+                  child: ShowCaseWidget(
+                    onFinish: () async {
+                      if (await walkthroughService.getCurrentStep() == 5) {
+                        await walkthroughService.completeWalkthrough();
+                      }
+                    },
+                    builder: Builder(
+                      builder: (context) => widget.child,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -115,7 +136,17 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
       );
     }
     return Scaffold(
-      body: SafeArea(child: widget.child),
+      body: SafeArea(
+          child: ShowCaseWidget(
+        onFinish: () async {
+          if (await walkthroughService.getCurrentStep() == 5) {
+            await walkthroughService.completeWalkthrough();
+          }
+        },
+        builder: Builder(
+          builder: (context) => widget.child,
+        ),
+      )),
       bottomNavigationBar: const VerzusBottomNavBar(),
     );
   }
@@ -138,7 +169,6 @@ class _Sidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final responsive = Responsive(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
     final width = collapsed
         ? responsive.widthPercent(0.06)
         : responsive.widthPercent(0.18);
@@ -150,6 +180,7 @@ class _Sidebar extends ConsumerWidget {
         color: colorScheme.surface,
         border: Border(
             right: BorderSide(
+                // ignore: deprecated_member_use
                 color: colorScheme.outline.withOpacity(0.15),
                 width: 0.5)),
       ),
@@ -185,46 +216,58 @@ class _Sidebar extends ConsumerWidget {
               selected: currentIndex == 0,
               collapsed: collapsed,
               onTap: () => onItemTap(0)),
-          _SidebarItem(
-              icon: Icons.sports_esports_rounded,
-              label: 'Matches',
-              selected: currentIndex == 1,
-              collapsed: collapsed,
-              onTap: () => onItemTap(1)),
-          _SidebarItem(
-              icon: Icons.emoji_events_rounded,
-              label: 'Tournaments',
-              selected: currentIndex == 2,
-              collapsed: collapsed,
-              onTap: () => onItemTap(2)),
           Showcase(
-            key: walkthroughService!.notificationsTabKey,
-            description: 'Check your notifications here!',
+            key: WalkthroughKeys.matchesTab,
+            description: 'Create and join matches here!',
             child: _SidebarItem(
-                icon: Icons.notifications_rounded,
-                label: 'Notifications',
-                selected: currentIndex == 3,
+                icon: Icons.sports_esports_rounded,
+                label: 'Matches',
+                selected: currentIndex == 1,
                 collapsed: collapsed,
-                onTap: () => onItemTap(3)),
+                onTap: () => onItemTap(1)),
           ),
+          Showcase(
+            key: WalkthroughKeys.tournamentsTab,
+            description: 'Compete in tournaments here!',
+            child: _SidebarItem(
+                icon: Icons.emoji_events_rounded,
+                label: 'Tournaments',
+                selected: currentIndex == 2,
+                collapsed: collapsed,
+                onTap: () => onItemTap(2)),
+          ),
+          _SidebarItem(
+              icon: Icons.notifications_rounded,
+              label: 'Notifications',
+              selected: currentIndex == 3,
+              collapsed: collapsed,
+              onTap: () => onItemTap(3)),
           _SidebarItem(
               icon: Icons.poll_rounded,
               label: 'Topics',
               selected: currentIndex == 4,
               collapsed: collapsed,
               onTap: () => onItemTap(4)),
-          _SidebarItem(
-              icon: Icons.account_balance_wallet_rounded,
-              label: 'Wallet',
-              selected: currentIndex == 5,
-              collapsed: collapsed,
-              onTap: () => onItemTap(5)),
-          _SidebarItem(
-              icon: Icons.person_rounded,
-              label: 'Profile',
-              selected: currentIndex == 6,
-              collapsed: collapsed,
-              onTap: () => onItemTap(6)),
+          Showcase(
+            key: WalkthroughKeys.walletTab,
+            description: 'Manage your earnings here!',
+            child: _SidebarItem(
+                icon: Icons.account_balance_wallet_rounded,
+                label: 'Wallet',
+                selected: currentIndex == 5,
+                collapsed: collapsed,
+                onTap: () => onItemTap(5)),
+          ),
+          Showcase(
+            key: WalkthroughKeys.profileTab,
+            description: 'View your profile and settings here!',
+            child: _SidebarItem(
+                icon: Icons.person_rounded,
+                label: 'Profile',
+                selected: currentIndex == 6,
+                collapsed: collapsed,
+                onTap: () => onItemTap(6)),
+          ),
           _SidebarItem(
               icon: Icons.admin_panel_settings_rounded,
               label: 'Admin',
@@ -243,10 +286,12 @@ class _Sidebar extends ConsumerWidget {
               width: double.infinity,
               padding: EdgeInsets.all(responsive.diagonalPercent(0.015)),
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: colorScheme.primary.withOpacity(0.08),
                 borderRadius:
                     BorderRadius.circular(responsive.diagonalPercent(0.015)),
                 border:
+                    // ignore: deprecated_member_use
                     Border.all(color: colorScheme.primary.withOpacity(0.18)),
               ),
               child: Row(
@@ -314,11 +359,13 @@ class _SidebarItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: selected
+              // ignore: deprecated_member_use
               ? colorScheme.primary.withOpacity(0.08)
               : colorScheme.surface,
           borderRadius:
               BorderRadius.circular(responsive.diagonalPercent(0.012)),
           border: selected
+              // ignore: deprecated_member_use
               ? Border.all(color: colorScheme.primary.withOpacity(0.2))
               : null,
         ),
@@ -388,8 +435,8 @@ class VerzusBottomNavBar extends ConsumerWidget {
 
     final theme = Theme.of(context);
     final barColor = theme.colorScheme.surface;
+    // ignore: deprecated_member_use
     final borderColor = theme.colorScheme.outline.withOpacity(0.15);
-    final walkthroughService = ref.watch(walkthroughServiceProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -407,19 +454,33 @@ class VerzusBottomNavBar extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: items.map((item) {
               final isActive = currentLocation == item['path'];
-              final child = _ResponsiveNavBarItem(
+              Widget child = _ResponsiveNavBarItem(
                 icon: item['icon'] as IconData,
                 label: item['label'] as String,
                 path: item['path'] as String,
                 isActive: isActive,
               );
-              if (item['path'] == '/') {
-                return Showcase(
-                  key: walkthroughService!.gamesTabKey,
-                  description: 'Browse the Game Library here!',
+
+              if (item['path'] == '/matches') {
+                child = Showcase(
+                  key: WalkthroughKeys.matchesTab,
+                  description: 'Create and join matches here!',
+                  child: child,
+                );
+              } else if (item['path'] == '/tournaments') {
+                child = Showcase(
+                  key: WalkthroughKeys.tournamentsTab,
+                  description: 'Compete in tournaments here!',
+                  child: child,
+                );
+              } else if (item['path'] == '/wallet') {
+                child = Showcase(
+                  key: WalkthroughKeys.walletTab,
+                  description: 'Manage your earnings here!',
                   child: child,
                 );
               }
+
               return child;
             }).toList(),
           ),
@@ -460,6 +521,7 @@ class _ResponsiveNavBarItem extends StatelessWidget {
           vertical: responsive.heightPercent(0.01),
         ),
         decoration: BoxDecoration(
+          // ignore: deprecated_member_use
           color: isActive ? primary.withOpacity(0.08) : colorScheme.surface,
           borderRadius:
               BorderRadius.circular(responsive.diagonalPercent(0.015)),

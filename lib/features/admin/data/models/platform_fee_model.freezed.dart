@@ -178,6 +178,7 @@ class _$PlatformFeeModelImpl implements _PlatformFeeModel {
   }
 
   @override
+  // ignore: non_nullable_equals_parameter
   bool operator ==(dynamic other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
@@ -193,8 +194,8 @@ class _$PlatformFeeModelImpl implements _PlatformFeeModel {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, matches, tournaments, autoTournaments, topics);
+  int get hashCode => Object.hash(
+      runtimeType, id, matches, tournaments, autoTournaments, topics);
 
   @JsonKey(ignore: true)
   @override

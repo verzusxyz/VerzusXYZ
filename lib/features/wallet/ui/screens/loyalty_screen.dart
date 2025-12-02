@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/auth/data/repositories/auth_repository.dart';
-import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/features/wallet/data/repositories/loyalty_repository.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/widgets/verzus_button.dart';
@@ -84,7 +83,8 @@ class LoyaltyScreen extends ConsumerWidget {
   }
 }
 
-final loyaltyHistoryProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+final loyaltyHistoryProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   final authUser = ref.watch(authRepositoryProvider).currentUser;
   if (authUser != null) {
     return ref.watch(loyaltyRepositoryProvider).getLoyaltyHistory(authUser.uid);

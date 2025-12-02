@@ -1,14 +1,15 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/games/data/models/game_model.dart';
-import 'package:verzus/services/admin_service.dart';
 import 'package:verzus/services/auth_service.dart';
 import 'package:verzus/services/games_service.dart';
-import 'package:verzus/services/sponsored_tournament_service.dart';
-import 'package:verzus/theme.dart';
 import 'package:verzus/widgets/verzus_button.dart';
 import 'package:verzus/widgets/shimmers.dart';
 import 'package:verzus/features/matches/data/models/match_model.dart';
+import 'package:verzus/features/admin/data/repositories/sponsored_tournament_repository.dart';
+import 'package:verzus/features/admin/data/repositories/admin_repository.dart';
 import 'package:verzus/services/match_service.dart';
 import 'package:verzus/services/result_tracker.dart';
 
@@ -97,9 +98,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
       }
 
       try {
-        await ref
-            .read(sponsoredTournamentServiceProvider)
-            .createSponsoredTournament(
+        await ref.read(sponsoredTournamentRepository).createSponsoredTournament(
               name: name,
               prizePool: prizePool,
               prizeDistribution: prizeDistribution,
@@ -129,7 +128,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
           double.tryParse(_affiliateCommissionController.text) ?? 0.0;
 
       try {
-        await ref.read(adminServiceProvider).addAffiliateLevel(
+        await ref.read(adminRepository).addAffiliateLevel(
               name: name,
               commissionRate: commissionRate,
             );
@@ -157,7 +156,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
       final topics = double.tryParse(_topicsFeeController.text) ?? 0.0;
 
       try {
-        await ref.read(adminServiceProvider).savePlatformFees(
+        await ref.read(adminRepository).savePlatformFees(
               matches: matches,
               tournaments: tournaments,
               autoTournaments: autoTournaments,
