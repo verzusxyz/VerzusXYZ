@@ -33,40 +33,6 @@ class WalletRepository {
         .map((doc) => doc.exists ? doc.data() as Map<String, dynamic> : null);
   }
 
-  /// Creates a new wallet transaction in Firestore.
-  Future<String> createTransaction({
-    required String userId,
-    required String type,
-    required double amount,
-    required String description,
-    String? relatedMatchId,
-    String? relatedTournamentId,
-    String? paymentMethod,
-    String? externalTransactionId,
-  }) async {
-    try {
-      final transactionRef =
-          _firestore.collection(FirestoreSchema.walletTransactions).doc();
-      await transactionRef.set({
-        WalletTransactionDocument.id: transactionRef.id,
-        WalletTransactionDocument.userId: userId,
-        WalletTransactionDocument.type: type,
-        WalletTransactionDocument.amount: amount,
-        WalletTransactionDocument.status: FirestoreConstants.transactionStatusPending,
-        WalletTransactionDocument.description: description,
-        WalletTransactionDocument.relatedMatchId: relatedMatchId,
-        WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
-        WalletTransactionDocument.paymentMethod: paymentMethod,
-        WalletTransactionDocument.externalTransactionId: externalTransactionId,
-        WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
-        WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
-      });
-      return transactionRef.id;
-    } on FirebaseException {
-      rethrow;
-    }
-  }
-
   /// Retrieves a stream of transactions for a specific user from Firestore.
   Stream<List<Map<String, dynamic>>> getUserTransactions(String userId,
       {int limit = 50}) {
