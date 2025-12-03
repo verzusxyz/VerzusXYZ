@@ -211,38 +211,55 @@ class PaymentService {
     required String method,
     required String externalRef,
   }) async {
-    final batch = FirebaseFirestore.instance.batch();
-    final walletRef = FirebaseFirestore.instance.collection(FirestoreSchema.wallets).doc(userId);
-    final txRef = FirebaseFirestore.instance.collection(FirestoreSchema.walletTransactions).doc();
+    final firestore = FirebaseFirestore.instance;
+    final walletRef = firestore.collection(FirestoreSchema.wallets).doc(userId);
+    final txRef = firestore.collection(FirestoreSchema.walletTransactions).doc();
 
-    // Ensure wallet exists and increment via merge
-    batch.set(walletRef, {
-      WalletDocument.userId: userId,
-      WalletDocument.balance: FieldValue.increment(net),
-      WalletDocument.totalDeposited: FieldValue.increment(grossAmount),
-      WalletDocument.updatedAt: FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await firestore.runTransaction((transaction) async {
+      final walletSnap = await transaction.get(walletRef);
 
-    batch.set(txRef, {
-      WalletTransactionDocument.id: txRef.id,
-      WalletTransactionDocument.userId: userId,
-      WalletTransactionDocument.type: FirestoreConstants.transactionTypeDeposit,
-      WalletTransactionDocument.amount: net, // legacy amount field keeps net
-      WalletTransactionDocument.status: FirestoreConstants.transactionStatusCompleted,
-      WalletTransactionDocument.description: 'Deposit ${grossAmount.toStringAsFixed(2)} $currency (fee ${fee.toStringAsFixed(2)}) via $method',
-      WalletTransactionDocument.paymentMethod: method,
-      WalletTransactionDocument.externalTransactionId: externalRef,
-      // Extended fields for transparency
-      'currency': currency,
-      'gross_amount': _round(grossAmount),
-      'gateway_fee': _round(fee),
-      'net_amount': _round(net),
-      'usd_equivalent': _round(usdEquivalent),
-      WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
-      WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+      if (walletSnap.exists) {
+        transaction.update(walletRef, {
+          WalletDocument.balance: FieldValue.increment(net),
+          WalletDocument.totalDeposited: FieldValue.increment(grossAmount),
+          WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        transaction.set(walletRef, {
+          WalletDocument.userId: userId,
+          WalletDocument.balance: net,
+          WalletDocument.pendingBalance: 0.0,
+          WalletDocument.totalDeposited: grossAmount,
+          WalletDocument.totalWithdrawn: 0.0,
+          WalletDocument.totalWon: 0.0,
+          WalletDocument.totalLost: 0.0,
+          'demo_balance': 100.0,
+          'demo_pending_balance': 0.0,
+          'loyaltyPoints': 0,
+          WalletDocument.createdAt: FieldValue.serverTimestamp(),
+          WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      transaction.set(txRef, {
+        WalletTransactionDocument.id: txRef.id,
+        WalletTransactionDocument.userId: userId,
+        WalletTransactionDocument.type: FirestoreConstants.transactionTypeDeposit,
+        WalletTransactionDocument.amount: net,
+        WalletTransactionDocument.status: FirestoreConstants.transactionStatusCompleted,
+        WalletTransactionDocument.description:
+            'Deposit ${grossAmount.toStringAsFixed(2)} $currency (fee ${fee.toStringAsFixed(2)}) via $method',
+        WalletTransactionDocument.paymentMethod: method,
+        WalletTransactionDocument.externalTransactionId: externalRef,
+        'currency': currency,
+        'gross_amount': _round(grossAmount),
+        'gateway_fee': _round(fee),
+        'net_amount': _round(net),
+        'usd_equivalent': _round(usdEquivalent),
+        WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
+        WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+      });
     });
-
-    await batch.commit();
   }
 
   // ---------------------------
