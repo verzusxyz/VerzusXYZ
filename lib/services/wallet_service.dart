@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
-import 'package:verzus/services/staking_service.dart';
 
 final walletServiceProvider = Provider<WalletService>((ref) {
   return WalletService();
@@ -86,6 +85,134 @@ class WalletService {
     }
   }
 
+  Future<void> lockFunds(String userId, double amount,
+      {WalletKind kind = WalletKind.live}) async {
+    try {
+      await _firestore.runTransaction((txn) async {
+        final ref = _firestore.collection(FirestoreSchema.wallets).doc(userId);
+        final snap = await txn.get(ref);
+        if (!snap.exists) {
+          throw Exception('Wallet not found');
+        }
+        final data = snap.data() as Map<String, dynamic>;
+        if (kind == WalletKind.live) {
+          final currentBalance =
+              (data[WalletDocument.balance] ?? 0.0).toDouble();
+          final currentPending =
+              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+          if (currentBalance < amount) {
+            throw Exception('Insufficient funds');
+          }
+          txn.update(ref, {
+            WalletDocument.balance: currentBalance - amount,
+            WalletDocument.pendingBalance: currentPending + amount,
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          final currentBalance = (data['demo_balance'] ?? 0.0).toDouble();
+          final currentPending =
+              (data['demo_pending_balance'] ?? 0.0).toDouble();
+          if (currentBalance < amount) {
+            throw Exception('Insufficient demo funds');
+          }
+          txn.update(ref, {
+            'demo_balance': currentBalance - amount,
+            'demo_pending_balance': currentPending + amount,
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error locking funds: $e');
+      throw Exception('Failed to lock funds');
+    }
+  }
+
+  Future<void> unlockFunds(String userId, double amount,
+      {WalletKind kind = WalletKind.live}) async {
+    try {
+      await _firestore.runTransaction((txn) async {
+        final ref = _firestore.collection(FirestoreSchema.wallets).doc(userId);
+        final snap = await txn.get(ref);
+        if (!snap.exists) {
+          throw Exception('Wallet not found');
+        }
+        final data = snap.data() as Map<String, dynamic>;
+        if (kind == WalletKind.live) {
+          final currentBalance =
+              (data[WalletDocument.balance] ?? 0.0).toDouble();
+          final currentPending =
+              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+          if (currentPending < amount) {
+            throw Exception('Insufficient locked funds');
+          }
+          txn.update(ref, {
+            WalletDocument.balance: currentBalance + amount,
+            WalletDocument.pendingBalance: currentPending - amount,
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          final currentBalance = (data['demo_balance'] ?? 0.0).toDouble();
+          final currentPending =
+              (data['demo_pending_balance'] ?? 0.0).toDouble();
+          if (currentPending < amount) {
+            throw Exception('Insufficient locked demo funds');
+          }
+          txn.update(ref, {
+            'demo_balance': currentBalance + amount,
+            'demo_pending_balance': currentPending - amount,
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error unlocking funds: $e');
+      throw Exception('Failed to unlock funds');
+    }
+  }
+
+  /// Consume locked funds without returning to balance (used for entry fees and lost wagers)
+  Future<void> consumeLocked(String userId, double amount,
+      {WalletKind kind = WalletKind.live}) async {
+    try {
+      await _firestore.runTransaction((txn) async {
+        final ref = _firestore.collection(FirestoreSchema.wallets).doc(userId);
+        final snap = await txn.get(ref);
+        if (!snap.exists) {
+          throw Exception('Wallet not found');
+        }
+        final data = snap.data() as Map<String, dynamic>;
+        if (kind == WalletKind.live) {
+          final currentPending =
+              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+          if (currentPending < amount) {
+            throw Exception('Insufficient locked funds');
+          }
+          txn.update(ref, {
+            WalletDocument.pendingBalance: currentPending - amount,
+            WalletDocument.totalLost: FieldValue.increment(amount),
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          final currentPending =
+              (data['demo_pending_balance'] ?? 0.0).toDouble();
+          if (currentPending < amount) {
+            throw Exception('Insufficient locked demo funds');
+          }
+          txn.update(ref, {
+            'demo_pending_balance': currentPending - amount,
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error consuming locked funds: $e');
+      rethrow;
+    }
+  }
 
   /// Credit balance (e.g., prize payout)
   Future<void> creditBalance(String userId, double amount,
@@ -221,12 +348,10 @@ class WalletModeNotifier extends Notifier<WalletKind> {
 
 class WalletNotifier extends Notifier<WalletModel?> {
   late final WalletService _walletService;
-  late final StakingService _stakingService;
 
   @override
   WalletModel? build() {
     _walletService = ref.read(walletServiceProvider);
-    _stakingService = ref.read(stakingServiceProvider);
     return null;
   }
 
@@ -261,8 +386,20 @@ class WalletNotifier extends Notifier<WalletModel?> {
     if (state == null) return;
 
     try {
-      await _stakingService.lockFunds(state!.userId, amount, kind: kind);
-      // The wallet stream will update the state automatically.
+      await _walletService.lockFunds(state!.userId, amount, kind: kind);
+      if (kind == WalletKind.live) {
+        state = state!.copyWith(
+          balance: state!.balance - amount,
+          pendingBalance: state!.pendingBalance + amount,
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        state = state!.copyWith(
+          demoBalance: state!.demoBalance - amount,
+          demoPendingBalance: state!.demoPendingBalance + amount,
+          updatedAt: DateTime.now(),
+        );
+      }
     } catch (e) {
       // ignore: avoid_print
       print('Error locking funds: $e');
@@ -275,8 +412,20 @@ class WalletNotifier extends Notifier<WalletModel?> {
     if (state == null) return;
 
     try {
-      await _stakingService.unlockFunds(state!.userId, amount, kind: kind);
-      // The wallet stream will update the state automatically.
+      await _walletService.unlockFunds(state!.userId, amount, kind: kind);
+      if (kind == WalletKind.live) {
+        state = state!.copyWith(
+          balance: state!.balance + amount,
+          pendingBalance: state!.pendingBalance - amount,
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        state = state!.copyWith(
+          demoBalance: state!.demoBalance + amount,
+          demoPendingBalance: state!.demoPendingBalance - amount,
+          updatedAt: DateTime.now(),
+        );
+      }
     } catch (e) {
       // ignore: avoid_print
       print('Error unlocking funds: $e');
@@ -373,19 +522,68 @@ class WalletNotifier extends Notifier<WalletModel?> {
     Map<String, double> winners, // Map<userId, prizeShare>
     double entryFee,
     double commissionRate, {
-    String? relatedMatchId,
-    String? relatedTournamentId,
     WalletKind kind = WalletKind.live,
   }) async {
-    await _stakingService.processPayouts(
-      participantIds,
-      winners,
-      entryFee,
-      commissionRate,
-      relatedMatchId: relatedMatchId,
-      relatedTournamentId: relatedTournamentId,
-      kind: kind,
-    );
-    // The wallet stream will update the state automatically.
+    final double totalPrizePool = participantIds.length * entryFee;
+    final double commission = totalPrizePool * commissionRate;
+    final double netPrizePool = totalPrizePool - commission;
+
+    await _walletService._firestore.runTransaction((transaction) async {
+      // 1. Consume entry fees from all participants' pending balances
+      for (final userId in participantIds) {
+        final ref = _walletService._firestore
+            .collection(FirestoreSchema.wallets)
+            .doc(userId);
+        final snap = await transaction.get(ref);
+        if (!snap.exists) {
+          throw Exception('Wallet for participant $userId not found.');
+        }
+
+        final data = snap.data() as Map<String, dynamic>;
+        if (kind == WalletKind.live) {
+          final currentPending =
+              (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+          if (currentPending < entryFee) {
+            throw Exception('Insufficient locked funds for $userId');
+          }
+          transaction.update(ref, {
+            WalletDocument.pendingBalance: currentPending - entryFee,
+            WalletDocument.totalLost: FieldValue.increment(entryFee),
+          });
+        } else {
+          final currentPending =
+              (data['demo_pending_balance'] ?? 0.0).toDouble();
+          if (currentPending < entryFee) {
+            throw Exception('Insufficient locked demo funds for $userId');
+          }
+          transaction
+              .update(ref, {'demo_pending_balance': currentPending - entryFee});
+        }
+      }
+
+      // 2. Distribute winnings to the winners' available balances
+      for (final winnerEntry in winners.entries) {
+        final winnerId = winnerEntry.key;
+        final prizeShare = winnerEntry.value;
+        final payout = netPrizePool * prizeShare;
+
+        final ref = _walletService._firestore
+            .collection(FirestoreSchema.wallets)
+            .doc(winnerId);
+
+        if (kind == WalletKind.live) {
+          transaction.update(ref, {
+            WalletDocument.balance: FieldValue.increment(payout),
+            WalletDocument.totalWon: FieldValue.increment(payout),
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.update(ref, {
+            'demo_balance': FieldValue.increment(payout),
+            WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    });
   }
 }

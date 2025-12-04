@@ -283,8 +283,6 @@ class FirestoreConstants {
   static const String transactionTypeWin = 'win';
   static const String transactionTypeFee = 'fee';
   static const String transactionTypeRefund = 'refund';
-  static const String transactionTypeEntryFee = 'entry_fee';
-  static const String transactionTypePayout = 'payout';
 
   // Transaction status values
   static const String transactionStatusPending = 'pending';
