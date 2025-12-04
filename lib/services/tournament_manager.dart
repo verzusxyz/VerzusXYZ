@@ -174,9 +174,6 @@ class TournamentManager {
           .read(ratingServiceProvider)
           .updateRatings(gameId, winnerId, loserId);
     }
-    await _ref
-        .read(walletServiceProvider)
-        .payoutTournament(completedMatchId, winnerId);
 
     // Here would be the complex logic to find the next match in the bracket
     // and update it with the winner/loser. This is a significant implementation
@@ -225,6 +222,7 @@ class TournamentManager {
         entryFee,
         commissionRate,
         kind: isDemo ? WalletKind.demo : WalletKind.live,
+        relatedTournamentId: tournamentId,
       );
     });
 
@@ -391,25 +389,102 @@ extension WalletServiceTournamentExt on WalletService {
     double entryFee,
     double commissionRate, {
     WalletKind kind = WalletKind.live,
+    String? relatedTournamentId,
   }) async {
-    final totalPrizePool =
-        entryFee * participantIds.length * (1 - commissionRate);
+    final double totalPrizePool = participantIds.length * entryFee;
+    final double commission = totalPrizePool * commissionRate;
+    final double netPrizePool = totalPrizePool - commission;
 
-    for (final entry in winners.entries) {
-      final userId = entry.key;
-      final percentage = entry.value;
-      final amount = totalPrizePool * percentage;
+    // 1. Consume entry fees from all participants' pending balances
+    for (final userId in participantIds) {
+      final ref = FirebaseFirestore.instance
+          .collection(FirestoreSchema.wallets)
+          .doc(userId);
+      final snap = await transaction.get(ref);
+      if (!snap.exists) {
+        throw Exception('Wallet for participant $userId not found.');
+      }
 
-      if (amount > 0) {
-        final walletRef = FirebaseFirestore.instance
-            .collection(FirestoreSchema.wallets)
-            .doc(userId);
-        transaction.update(walletRef, {
-          (kind == WalletKind.live ? WalletDocument.balance : 'demo_balance'):
-              FieldValue.increment(amount),
+      final data = snap.data() as Map<String, dynamic>;
+      if (kind == WalletKind.live) {
+        final currentPending =
+            (data[WalletDocument.pendingBalance] ?? 0.0).toDouble();
+        if (currentPending < entryFee) {
+          throw Exception('Insufficient locked funds for $userId');
+        }
+        transaction.update(ref, {
+          WalletDocument.pendingBalance: currentPending - entryFee,
+          WalletDocument.totalLost: FieldValue.increment(entryFee),
+        });
+      } else {
+        final currentPending =
+            (data['demo_pending_balance'] ?? 0.0).toDouble();
+        if (currentPending < entryFee) {
+          throw Exception('Insufficient locked demo funds for $userId');
+        }
+        transaction
+            .update(ref, {'demo_pending_balance': currentPending - entryFee});
+      }
+
+      // Create a transaction record for the entry fee
+      final txRef = FirebaseFirestore.instance
+          .collection(FirestoreSchema.walletTransactions)
+          .doc();
+      transaction.set(txRef, {
+        WalletTransactionDocument.id: txRef.id,
+        WalletTransactionDocument.userId: userId,
+        WalletTransactionDocument.type:
+            FirestoreConstants.transactionTypeEntryFee,
+        WalletTransactionDocument.amount: -entryFee,
+        WalletTransactionDocument.status:
+            FirestoreConstants.transactionStatusCompleted,
+        WalletTransactionDocument.description: 'Entry fee for match/tournament',
+        WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
+        WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
+        WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    // 2. Distribute winnings to the winners' available balances
+    for (final winnerEntry in winners.entries) {
+      final winnerId = winnerEntry.key;
+      final prizeShare = winnerEntry.value;
+      final payout = netPrizePool * prizeShare;
+
+      final ref = FirebaseFirestore.instance
+          .collection(FirestoreSchema.wallets)
+          .doc(winnerId);
+
+      if (kind == WalletKind.live) {
+        transaction.update(ref, {
+          WalletDocument.balance: FieldValue.increment(payout),
+          WalletDocument.totalWon: FieldValue.increment(payout),
+          WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        transaction.update(ref, {
+          'demo_balance': FieldValue.increment(payout),
           WalletDocument.updatedAt: FieldValue.serverTimestamp(),
         });
       }
+
+      // Create a transaction record for the payout
+      final txRef = FirebaseFirestore.instance
+          .collection(FirestoreSchema.walletTransactions)
+          .doc();
+      transaction.set(txRef, {
+        WalletTransactionDocument.id: txRef.id,
+        WalletTransactionDocument.userId: winnerId,
+        WalletTransactionDocument.type: FirestoreConstants.transactionTypePayout,
+        WalletTransactionDocument.amount: payout,
+        WalletTransactionDocument.status:
+            FirestoreConstants.transactionStatusCompleted,
+        WalletTransactionDocument.description:
+            'Prize payout for match/tournament',
+        WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
+        WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
+        WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+      });
     }
   }
 
