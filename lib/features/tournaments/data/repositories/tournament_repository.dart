@@ -120,7 +120,7 @@ class TournamentRepository {
 
   /// Updates a match with the winner's ID.
   Future<void> updateMatchWinner(
-      String tournamentId, String matchId, String winnerId) async {
+      String tournamentId, String matchId, String winnerId, String? loserId) async {
     final matchRef = _firestore
         .collection(FirestoreSchema.tournaments)
         .doc(tournamentId)
@@ -128,6 +128,7 @@ class TournamentRepository {
         .doc(matchId);
     await matchRef.update({
       'winnerId': winnerId,
+      'loserId': loserId,
       'isComplete': true,
       'updatedAt': FieldValue.serverTimestamp(),
     });
