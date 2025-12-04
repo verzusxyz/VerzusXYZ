@@ -5,7 +5,6 @@ import 'package:verzus/features/games/data/models/game_model.dart';
 import 'package:verzus/firestore/firestore_data_schema.dart';
 import 'package:verzus/features/wallet/data/models/wallet_model.dart';
 import 'package:verzus/services/rating_service.dart';
-import 'package:verzus/services/staking_service.dart';
 import 'package:verzus/services/wallet_service.dart';
 import 'package:verzus/features/tournaments/data/repositories/tournament_repository.dart';
 import 'package:verzus/features/tournaments/data/models/tournament_match_model.dart';
@@ -176,7 +175,7 @@ class TournamentManager {
           .updateRatings(gameId, winnerId, loserId);
     }
     await _ref
-        .read(stakingServiceProvider)
+        .read(walletServiceProvider)
         .processStakesForMatch(completedMatchId, winnerId);
 
     // Here would be the complex logic to find the next match in the bracket

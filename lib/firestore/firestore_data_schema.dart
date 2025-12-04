@@ -13,7 +13,7 @@ class FirestoreSchema {
   static const String tournaments = 'tournaments';
   static const String tournamentParticipants = 'tournament_participants';
   static const String skillTopics = 'skill_topics';
-  static const String polls = 'polls';
+  static const String votes = 'votes';
   static const String leaderboardEntries = 'leaderboard_entries';
   static const String gameResults = 'game_results';
   static const String systemSettings = 'system_settings';
@@ -186,13 +186,14 @@ class SkillTopicDocument {
 }
 
 //// Polls document structure
-class PollsDocument {
-  static const String pollId = 'poll_id';
+class VoteDocument {
+  static const String votesId = 'votes_id';
+  static const String topicId = 'topic_id';
   static const String userId = 'user_id';
   static const String optionIndex = 'option_index';
   static const String entryFee = 'entry_fee';
-  static const String createdAt = 'created_at';
   static const String walletKind = 'wallet_kind';
+  static const String createdAt = 'created_at';
 }
 
 /// Leaderboard entry document structure
@@ -283,6 +284,8 @@ class FirestoreConstants {
   static const String transactionTypeWin = 'win';
   static const String transactionTypeFee = 'fee';
   static const String transactionTypeRefund = 'refund';
+  static const String transactionTypeEntryFee = 'entry_fee';
+  static const String transactionTypePayout = 'payout';
 
   // Transaction status values
   static const String transactionStatusPending = 'pending';

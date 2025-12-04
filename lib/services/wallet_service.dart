@@ -522,6 +522,8 @@ class WalletNotifier extends Notifier<WalletModel?> {
     Map<String, double> winners, // Map<userId, prizeShare>
     double entryFee,
     double commissionRate, {
+    String? relatedMatchId,
+    String? relatedTournamentId,
     WalletKind kind = WalletKind.live,
   }) async {
     final double totalPrizePool = participantIds.length * entryFee;
@@ -559,6 +561,24 @@ class WalletNotifier extends Notifier<WalletModel?> {
           transaction
               .update(ref, {'demo_pending_balance': currentPending - entryFee});
         }
+
+        // Create a transaction record for the entry fee
+        final txRef = _walletService._firestore
+            .collection(FirestoreSchema.walletTransactions)
+            .doc();
+        transaction.set(txRef, {
+          WalletTransactionDocument.id: txRef.id,
+          WalletTransactionDocument.userId: userId,
+          WalletTransactionDocument.type: FirestoreConstants.transactionTypeEntryFee,
+          WalletTransactionDocument.amount: -entryFee,
+          WalletTransactionDocument.status: FirestoreConstants.transactionStatusCompleted,
+          WalletTransactionDocument.description:
+              'Entry fee for match/tournament',
+          WalletTransactionDocument.relatedMatchId: relatedMatchId,
+          WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
+          WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
+          WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
       }
 
       // 2. Distribute winnings to the winners' available balances
@@ -583,6 +603,24 @@ class WalletNotifier extends Notifier<WalletModel?> {
             WalletDocument.updatedAt: FieldValue.serverTimestamp(),
           });
         }
+
+        // Create a transaction record for the payout
+        final txRef = _walletService._firestore
+            .collection(FirestoreSchema.walletTransactions)
+            .doc();
+        transaction.set(txRef, {
+          WalletTransactionDocument.id: txRef.id,
+          WalletTransactionDocument.userId: winnerId,
+          WalletTransactionDocument.type: FirestoreConstants.transactionTypePayout,
+          WalletTransactionDocument.amount: payout,
+          WalletTransactionDocument.status: FirestoreConstants.transactionStatusCompleted,
+          WalletTransactionDocument.description:
+              'Prize payout for match/tournament',
+          WalletTransactionDocument.relatedMatchId: relatedMatchId,
+          WalletTransactionDocument.relatedTournamentId: relatedTournamentId,
+          WalletTransactionDocument.createdAt: FieldValue.serverTimestamp(),
+          WalletTransactionDocument.updatedAt: FieldValue.serverTimestamp(),
+        });
       }
     });
   }
