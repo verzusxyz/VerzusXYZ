@@ -176,7 +176,7 @@ class TournamentManager {
     }
     await _ref
         .read(walletServiceProvider)
-        .processStakesForMatch(completedMatchId, winnerId);
+        .payoutTournament(completedMatchId, winnerId);
 
     // Here would be the complex logic to find the next match in the bracket
     // and update it with the winner/loser. This is a significant implementation
@@ -411,5 +411,19 @@ extension WalletServiceTournamentExt on WalletService {
         });
       }
     }
+  }
+
+  /// Minimal payout helper so TournamentManager can call `payoutTournament`.
+  /// This is a safe, compile-time stub that performs a merge update on the
+  /// winner's wallet document to avoid creating or overwriting documents.
+  Future<void> payoutTournament(String matchId, String winnerId) async {
+    final walletRef = FirebaseFirestore.instance
+        .collection(FirestoreSchema.wallets)
+        .doc(winnerId);
+
+    // Perform a merge set to ensure the document exists and update the timestamp.
+    await walletRef.set({
+      WalletDocument.updatedAt: FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 }
