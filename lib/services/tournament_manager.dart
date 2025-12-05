@@ -160,14 +160,15 @@ class TournamentManager {
     required String gameId,
   }) async {
     final repo = _ref.read(tournamentRepositoryProvider);
-    await repo.updateMatchWinner(tournamentId, completedMatchId, winnerId);
-
     final allMatches = await repo.getAllMatches(tournamentId);
     final completedMatch =
         allMatches.firstWhere((m) => m.matchId == completedMatchId);
     final loserId = (completedMatch.player1Id == winnerId)
         ? completedMatch.player2Id
         : completedMatch.player1Id;
+
+    await repo.updateMatchWinner(
+        tournamentId, completedMatchId, winnerId, loserId);
 
     if (loserId != null) {
       await _ref
@@ -178,6 +179,151 @@ class TournamentManager {
     // Here would be the complex logic to find the next match in the bracket
     // and update it with the winner/loser. This is a significant implementation
     // and will be stubbed out for now as per the user's acceptance of this limitation.
+    final tournamentDoc = await _fs
+        .collection(FirestoreSchema.tournaments)
+        .doc(tournamentId)
+        .get();
+    final tournament = tournamentDoc.data();
+
+    if (tournament == null) {
+      throw Exception('Tournament not found');
+    }
+
+    final tournamentType =
+        tournament[TournamentDocument.tournamentType] as String?;
+
+    if (tournamentType == 'double_elim_12') {
+      await _advanceWinnerInDoubleElim12(
+          tournamentId, completedMatch, winnerId, loserId, allMatches);
+    } else {
+      // Handle other tournament types or throw an error
+    }
+  }
+
+  Future<void> _advanceWinnerInDoubleElim12(
+      String tournamentId,
+      TournamentMatchModel completedMatch,
+      String winnerId,
+      String? loserId,
+      List<TournamentMatchModel> allMatches) async {
+    final repo = _ref.read(tournamentRepositoryProvider);
+
+    // Logic for a 12-player double-elimination bracket
+    if (completedMatch.roundNumber == 1) {
+      // Winners Bracket Round 1
+      final nextMatchNumber = (completedMatch.matchNumber / 2).ceil();
+      final nextMatch = allMatches.firstWhere(
+          (m) => m.roundNumber == 2 && m.matchNumber == nextMatchNumber);
+
+      if (nextMatch.player1Id == null) {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, winnerId, null);
+      } else {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, nextMatch.player1Id, winnerId);
+      }
+
+      // Loser drops to Losers Bracket
+      if (loserId != null) {
+        final loserMatchNumber = (completedMatch.matchNumber / 2).ceil();
+        final loserMatch = allMatches.firstWhere(
+            (m) => m.roundNumber == -1 && m.matchNumber == loserMatchNumber);
+
+        if (loserMatch.player1Id == null) {
+          await repo.updateMatchPlayers(
+              tournamentId, loserMatch.matchId, loserId, null);
+        } else {
+          await repo.updateMatchPlayers(
+              tournamentId, loserMatch.matchId, loserMatch.player1Id, loserId);
+        }
+      }
+    } else if (completedMatch.roundNumber == 2) {
+      // Winners Bracket Round 2
+      final nextMatchNumber = (completedMatch.matchNumber / 2).ceil();
+      final nextMatch = allMatches.firstWhere(
+          (m) => m.roundNumber == 3 && m.matchNumber == nextMatchNumber);
+
+      if (nextMatch.player1Id == null) {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, winnerId, null);
+      } else {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, nextMatch.player1Id, winnerId);
+      }
+
+      // Loser drops to Losers Bracket
+      if (loserId != null) {
+        final loserMatchNumber = completedMatch.matchNumber;
+        final loserMatch = allMatches.firstWhere(
+            (m) => m.roundNumber == -2 && m.matchNumber == loserMatchNumber);
+
+        if (loserMatch.player1Id == null) {
+          await repo.updateMatchPlayers(
+              tournamentId, loserMatch.matchId, loserId, null);
+        } else {
+          await repo.updateMatchPlayers(
+              tournamentId, loserMatch.matchId, loserMatch.player1Id, loserId);
+        }
+      }
+    } else if (completedMatch.roundNumber == -1) {
+      // Losers Bracket Round 1
+      final nextMatchNumber = completedMatch.matchNumber;
+      final nextMatch = allMatches.firstWhere(
+          (m) => m.roundNumber == -2 && m.matchNumber == nextMatchNumber);
+      if (nextMatch.player1Id == null) {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, winnerId, null);
+      } else {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, nextMatch.player1Id, winnerId);
+      }
+    } else if (completedMatch.roundNumber == 3) {
+      // Winners Bracket Final
+      final nextMatch = allMatches
+          .firstWhere((m) => m.roundNumber == 4 && m.matchNumber == 1);
+      await repo.updateMatchPlayers(
+          tournamentId, nextMatch.matchId, winnerId, null);
+      if (loserId != null) {
+        final loserMatch = allMatches
+            .firstWhere((m) => m.roundNumber == -3 && m.matchNumber == 1);
+        await repo.updateMatchPlayers(
+            tournamentId, loserMatch.matchId, loserId, null);
+      }
+    } else if (completedMatch.roundNumber == -2) {
+      // Losers Bracket Round 2
+      final nextMatch = allMatches
+          .firstWhere((m) => m.roundNumber == -3 && m.matchNumber == 1);
+      if (nextMatch.player1Id == null) {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, winnerId, null);
+      } else {
+        await repo.updateMatchPlayers(
+            tournamentId, nextMatch.matchId, nextMatch.player1Id, winnerId);
+      }
+    } else if (completedMatch.roundNumber == -3) {
+      // Losers Bracket Final
+      final nextMatch = allMatches
+          .firstWhere((m) => m.roundNumber == 4 && m.matchNumber == 1);
+      await repo.updateMatchPlayers(
+          tournamentId, nextMatch.matchId, nextMatch.player1Id, winnerId);
+    } else if (completedMatch.roundNumber == 4) {
+      // Grand Final
+      // Check if there are any other incomplete matches
+      final incompleteMatches =
+          allMatches.where((m) => !m.isComplete).toList();
+      if (incompleteMatches.isEmpty) {
+        // Tournament is over, determine final placements
+        final placements = [
+          winnerId,
+          loserId!,
+          // Determine 3rd place from the loser of the losers final
+          allMatches
+              .firstWhere((m) => m.roundNumber == -3 && m.isComplete)
+              .loserId!,
+        ];
+        await payoutTournament(tournamentId, placements);
+      }
+    }
   }
 
   Future<void> payoutTournament(
@@ -342,6 +488,12 @@ class AutoTournamentService {
     String tournamentId,
     List<String> playerIds,
   ) async {
+    await _firestore
+        .collection(FirestoreSchema.tournaments)
+        .doc(tournamentId)
+        .update({
+      TournamentDocument.tournamentType: 'double_elim_12',
+    });
     playerIds.shuffle();
     final batch = _firestore.batch();
     final matches = <Map<String, dynamic>>[];

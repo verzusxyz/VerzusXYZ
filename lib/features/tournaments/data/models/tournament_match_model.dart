@@ -9,6 +9,7 @@ class TournamentMatchModel {
   final String? player1Id;
   final String? player2Id;
   final String? winnerId;
+  final String? loserId;
   final bool isComplete;
 
   const TournamentMatchModel({
@@ -19,6 +20,7 @@ class TournamentMatchModel {
     this.player1Id,
     this.player2Id,
     this.winnerId,
+    this.loserId,
     this.isComplete = false,
   });
 
@@ -31,6 +33,7 @@ class TournamentMatchModel {
       'player1Id': player1Id,
       'player2Id': player2Id,
       'winnerId': winnerId,
+      'loserId': loserId,
       'isComplete': isComplete,
     };
   }
@@ -44,6 +47,7 @@ class TournamentMatchModel {
       player1Id: map['player1Id'],
       player2Id: map['player2Id'],
       winnerId: map['winnerId'],
+      loserId: map['loserId'],
       isComplete: map['isComplete'] ?? false,
     );
   }
@@ -56,6 +60,7 @@ class TournamentMatchModel {
     String? player1Id,
     String? player2Id,
     String? winnerId,
+    String? loserId,
     bool? isComplete,
   }) {
     return TournamentMatchModel(
@@ -66,6 +71,7 @@ class TournamentMatchModel {
       player1Id: player1Id ?? this.player1Id,
       player2Id: player2Id ?? this.player2Id,
       winnerId: winnerId ?? this.winnerId,
+      loserId: loserId ?? this.loserId,
       isComplete: isComplete ?? this.isComplete,
     );
   }
