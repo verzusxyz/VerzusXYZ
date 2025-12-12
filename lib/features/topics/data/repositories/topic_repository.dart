@@ -1,22 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:verzus/core/services/firebase_service.dart';
 import 'package:verzus/features/topics/data/models/topic_model.dart';
+import 'package:verzus/firestore/firestore_data_schema.dart';
+
+final topicRepositoryProvider = Provider<TopicRepository>((ref) {
+  return TopicRepository(ref.read(firebaseServiceProvider));
+});
 
 class TopicRepository {
-  final FirebaseFirestore _firestore;
+  final FirebaseService _firebaseService;
 
-  TopicRepository(this._firestore);
+  TopicRepository(this._firebaseService);
 
-  Stream<List<Topic>> getTopics() {
-    return _firestore.collection('topics').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return Topic(id: doc.id, name: doc.data()['name'] ?? '');
-      }).toList();
-    });
+  FirebaseFirestore get _firestore => _firebaseService.firestore;
+
+  CollectionReference<TopicModel> get _topicsRef =>
+      _firestore.collection(FirestoreSchema.skillTopics).withConverter<TopicModel>(
+            fromFirestore: (snapshot, _) => TopicModel.fromFirestore(snapshot),
+            toFirestore: (topic, _) => topic.toFirestore(),
+          );
+
+  Stream<List<TopicModel>> getTopics() {
+    return _topicsRef
+        .where(SkillTopicDocument.isActive, isEqualTo: true)
+        .orderBy(SkillTopicDocument.name, descending: false)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  Future<void> createTopic(TopicModel topic) async {
+    await _topicsRef.add(topic);
   }
 }
-
-final topicRepositoryProvider = Provider((ref) {
-  final firestore = FirebaseFirestore.instance;
-  return TopicRepository(firestore);
-});
